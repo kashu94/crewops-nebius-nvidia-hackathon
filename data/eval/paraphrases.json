@@ -1,0 +1,245 @@
+{
+  "note": "Rewordings of the example questions (with other ids and dates), and questions outside crew control. Used to set the router's similarity floor; never indexed.",
+  "paraphrases": [
+    {
+      "id": "P01",
+      "of": "Q01",
+      "prompt": "Which crew are standing by in Bangalore on the 13th, and during what hours can we ring them?"
+    },
+    {
+      "id": "P02",
+      "of": "Q02",
+      "prompt": "How close is C-1931 to the seven-day duty cap as of the snapshot?"
+    },
+    {
+      "id": "P03",
+      "of": "Q03",
+      "prompt": "What leaves Delhi on 13 October?"
+    },
+    {
+      "id": "P04",
+      "of": "Q04",
+      "prompt": "Whose paperwork lapses in the month after 13 Oct?"
+    },
+    {
+      "id": "P05",
+      "of": "Q05",
+      "prompt": "What tail flies KS433 on 15 Oct and what's its capacity?"
+    },
+    {
+      "id": "P06",
+      "of": "Q06",
+      "prompt": "When can we reach C-3315 while on standby, and how quickly can they get in?"
+    },
+    {
+      "id": "P07",
+      "of": "Q07",
+      "prompt": "Where is C-1526 based and what type are they rated on?"
+    },
+    {
+      "id": "P08",
+      "of": "Q08",
+      "prompt": "Give me the crew line-up for P-2204 with their positions."
+    },
+    {
+      "id": "P09",
+      "of": "Q09",
+      "prompt": "What do we operate from Bengaluru to Mumbai on the 15th?"
+    },
+    {
+      "id": "P10",
+      "of": "Q10",
+      "prompt": "Count everything we're operating on 14 October."
+    },
+    {
+      "id": "P11",
+      "of": "Q11",
+      "prompt": "Tell me the captains whose home base is Delhi."
+    },
+    {
+      "id": "P12",
+      "of": "Q12",
+      "prompt": "Which sectors are the longest by block, and how long are they?"
+    },
+    {
+      "id": "P13",
+      "of": "Q13",
+      "prompt": "What position does C-1694 hold and how much have they flown in the last four weeks?"
+    },
+    {
+      "id": "P14",
+      "of": "Q14",
+      "prompt": "Where can you get to directly from Bangalore?"
+    },
+    {
+      "id": "P15",
+      "of": "Q15",
+      "prompt": "Who's the purser on VT-DXA's trip on 14 Oct?"
+    },
+    {
+      "id": "P16",
+      "of": "Q16",
+      "prompt": "Why is C-3940 flagged as likely to go sick?"
+    },
+    {
+      "id": "P17",
+      "of": "Q17",
+      "prompt": "C-3231 phoned in unwell this morning for P-2224. What does that leave without crew?"
+    },
+    {
+      "id": "P18",
+      "of": "Q18",
+      "prompt": "Would putting C-1600 on P-2224 break anything? Spell it out."
+    },
+    {
+      "id": "P19",
+      "of": "Q19",
+      "prompt": "Hyderabad shuts 06:00–10:00Z on 16 Oct. What gets hit?"
+    },
+    {
+      "id": "P20",
+      "of": "Q20",
+      "prompt": "DX421 on 15 Oct goes two hours late. Are the crew still OK to finish the day?"
+    },
+    {
+      "id": "P21",
+      "of": "Q21",
+      "prompt": "Could the Delhi-based captain C-2210 be flown down to take P-2224, and what does that do to the schedule?"
+    },
+    {
+      "id": "P22",
+      "of": "Q22",
+      "prompt": "Is C-2087 allowed to do their duty on 16 Oct?"
+    },
+    {
+      "id": "P23",
+      "of": "Q23",
+      "prompt": "Someone finished at 14:45Z on 13 Oct. When's the soonest they can sign on again?"
+    },
+    {
+      "id": "P24",
+      "of": "Q24",
+      "prompt": "Is C-3315 able to take the whole of P-2224, both days?"
+    },
+    {
+      "id": "P25",
+      "of": "Q25",
+      "prompt": "Dropping NG454 on 15 Oct: how many people does that hit and what does it cost us?"
+    },
+    {
+      "id": "P26",
+      "of": "Q26",
+      "prompt": "Who is above 45 hours on duty for the week to 14 Oct?"
+    },
+    {
+      "id": "P27",
+      "of": "Q27",
+      "prompt": "The VT-DXD skipper goes sick on 15 Oct at 02:00Z. Which standby captains can we actually call at that hour?"
+    },
+    {
+      "id": "P28",
+      "of": "Q28",
+      "prompt": "C-1017 would be moved onto P-2224. Allowed?"
+    },
+    {
+      "id": "P29",
+      "of": "Q29",
+      "prompt": "Goa is shut 04:00–08:00Z on 16 Oct. Which services does that touch?"
+    },
+    {
+      "id": "P30",
+      "of": "Q30",
+      "prompt": "If we had to scrap one sector, which would strand the most passengers?"
+    },
+    {
+      "id": "P31",
+      "of": "Q31",
+      "prompt": "C-3231 can't do P-2224. Give me the choices in order, with what each costs and why."
+    },
+    {
+      "id": "P32",
+      "of": "Q32",
+      "prompt": "The VT-DXC and VT-DXD captains are both off sick on 17 Oct. What's the best way to cover the two together?"
+    },
+    {
+      "id": "P33",
+      "of": "Q33",
+      "prompt": "VT-DXB is running two hours late on 15 Oct. How should the desk handle the duty-time problem?"
+    },
+    {
+      "id": "P34",
+      "of": "Q34",
+      "prompt": "C-2087's licence has run out. Sort out their 17 Oct trip."
+    },
+    {
+      "id": "P35",
+      "of": "Q35",
+      "prompt": "Hyderabad closes 06:00–10:00Z on 16 Oct. How do we put the operation back together?"
+    },
+    {
+      "id": "P36",
+      "of": "Q36",
+      "prompt": "Write the message telling C-3315 they're taking P-2224."
+    },
+    {
+      "id": "P37",
+      "of": "Q37",
+      "prompt": "Cheapest way to replace the VT-DXE first officer on 17 Oct who reports sick at 02:30Z?"
+    },
+    {
+      "id": "P38",
+      "of": "Q38",
+      "prompt": "For a daily morning summary, what three things should we show for each aircraft and why?"
+    }
+  ],
+  "off_topic": [
+    {
+      "id": "N01",
+      "prompt": "What's the weather like in Paris this weekend?"
+    },
+    {
+      "id": "N02",
+      "prompt": "Tell me a joke about pilots."
+    },
+    {
+      "id": "N03",
+      "prompt": "Book me a hotel room in Mumbai for tonight."
+    },
+    {
+      "id": "N04",
+      "prompt": "What is the capital of Australia?"
+    },
+    {
+      "id": "N05",
+      "prompt": "How do I reset my email password?"
+    },
+    {
+      "id": "N06",
+      "prompt": "Play some relaxing music."
+    },
+    {
+      "id": "N07",
+      "prompt": "Set an alarm for six tomorrow morning."
+    },
+    {
+      "id": "N08",
+      "prompt": "Who won the cricket match yesterday?"
+    },
+    {
+      "id": "N09",
+      "prompt": "Translate good morning into Hindi."
+    },
+    {
+      "id": "N10",
+      "prompt": "Order a large pizza to the office."
+    },
+    {
+      "id": "N11",
+      "prompt": "How much is a ticket from Delhi to London?"
+    },
+    {
+      "id": "N12",
+      "prompt": "Summarise the news for me."
+    }
+  ]
+}

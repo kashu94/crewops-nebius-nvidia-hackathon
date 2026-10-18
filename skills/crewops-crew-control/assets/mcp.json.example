@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "crewops": {
+      "type": "http",
+      "url": "${CREWOPS_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${CREWOPS_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

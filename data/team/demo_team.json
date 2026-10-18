@@ -1,0 +1,28 @@
+{
+  "note": "The demo team. Usernames and roles only: no email, phone or password is stored here. Crew members are linked to their roster records by crew id; controllers to their desk.",
+  "members": [
+    {"username": "ananya.iyer", "name": "Ananya Iyer", "roles": ["controller"], "desk": "desk-1"},
+    {"username": "rohit.malhotra", "name": "Rohit Malhotra", "roles": ["controller"], "desk": "desk-2"},
+    {"username": "divya.rao", "name": "Divya Rao", "roles": ["controller"], "desk": "desk-3"},
+    {"username": "meera.bhatt", "name": "Meera Bhatt", "roles": ["approver"]},
+    {"username": "karan.mehta", "name": "Karan Mehta", "roles": ["approver"]},
+    {"username": "farah.qureshi", "name": "Farah Qureshi", "roles": ["approver"]},
+    {"username": "imran.sheikh", "name": "Imran Sheikh", "roles": ["reporter"]},
+    {"username": "lakshmi.hegde", "name": "Lakshmi Hegde", "roles": ["reporter"]},
+    {"username": "nikhil.agarwal", "name": "Nikhil Agarwal", "roles": ["auditor"]},
+    {"username": "priya.desai", "name": "Priya Desai", "roles": ["admin"]},
+    {"username": "vikram.saxena", "name": "Vikram Saxena", "roles": ["super_admin"]},
+    {"username": "c1042.nair", "name": "A. Nair", "roles": ["crew"], "crew_id": "C-1042"},
+    {"username": "c3310.reddy", "name": "D. Reddy", "roles": ["crew"], "crew_id": "C-3310"},
+    {"username": "c5417.krishnan", "name": "S. Krishnan", "roles": ["crew"], "crew_id": "C-5417"},
+    {"username": "c2087.iyer", "name": "R. Iyer", "roles": ["crew"], "crew_id": "C-2087"},
+    {"username": "c1938.reddy", "name": "N. Reddy", "roles": ["crew"], "crew_id": "C-1938"},
+    {"username": "c2295.nair", "name": "S. Nair", "roles": ["crew"], "crew_id": "C-2295"},
+    {"username": "c1895.rao", "name": "P. Rao", "roles": ["crew"], "crew_id": "C-1895"},
+    {"username": "c3005.chandra", "name": "H. Chandra", "roles": ["crew"], "crew_id": "C-3005"},
+    {"username": "c1385.menon", "name": "D. Menon", "roles": ["crew"], "crew_id": "C-1385"},
+    {"username": "c3231.verma", "name": "L. Verma", "roles": ["crew"], "crew_id": "C-3231"},
+    {"username": "c1313.chandra", "name": "K. Chandra", "roles": ["crew"], "crew_id": "C-1313"},
+    {"username": "ops.speaker", "name": "Ops Room Speaker", "roles": ["speaker"]}
+  ]
+}

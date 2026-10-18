@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "crewops": {
+      "url": "${CREWOPS_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${CREWOPS_ACCESS_TOKEN}"
+      },
+      "disabled": false,
+      "autoApprove": ["whoami", "my_queue", "show_disruption", "disruptions", "ask", "operations_overview"]
+    }
+  }
+}

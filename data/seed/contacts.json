@@ -1,0 +1,128 @@
+[
+  {
+    "team": "gate_control",
+    "scope": "BLR",
+    "name": "Sameer Hegde",
+    "title": "BLR gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "BLR",
+    "name": "Neha Arora",
+    "title": "BLR station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "BOM",
+    "name": "Aditya Patil",
+    "title": "BOM gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "BOM",
+    "name": "Rhea Fernandes",
+    "title": "BOM station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "CCU",
+    "name": "Sourav Banerjee",
+    "title": "CCU gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "CCU",
+    "name": "Moumita Chatterjee",
+    "title": "CCU station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "COK",
+    "name": "Joseph Thomas",
+    "title": "COK gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "COK",
+    "name": "Anjali Varghese",
+    "title": "COK station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "DEL",
+    "name": "Kunal Khanna",
+    "title": "DEL gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "DEL",
+    "name": "Ritu Saxena",
+    "title": "DEL station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "GOI",
+    "name": "Ryan Dsouza",
+    "title": "GOI gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "GOI",
+    "name": "Priyanka Naik",
+    "title": "GOI station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "HYD",
+    "name": "Faisal Qureshi",
+    "title": "HYD gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "HYD",
+    "name": "Swathi Goud",
+    "title": "HYD station duty manager"
+  },
+  {
+    "team": "gate_control",
+    "scope": "MAA",
+    "name": "Karthik Subramanian",
+    "title": "MAA gate and stand controller"
+  },
+  {
+    "team": "station_ops",
+    "scope": "MAA",
+    "name": "Deepa Raghavan",
+    "title": "MAA station duty manager"
+  },
+  {
+    "team": "flight_info",
+    "scope": "NETWORK",
+    "name": "Tanvi Mathur",
+    "title": "Flight information duty officer"
+  },
+  {
+    "team": "ops_monitoring",
+    "scope": "NETWORK",
+    "name": "Harish Bhat",
+    "title": "Operations monitoring duty manager"
+  },
+  {
+    "team": "maintenance_control",
+    "scope": "NETWORK",
+    "name": "Gaurav Desai",
+    "title": "Maintenance control duty engineer"
+  },
+  {
+    "team": "crew_records",
+    "scope": "NETWORK",
+    "name": "Shalini Mehta",
+    "title": "Training and crew records officer"
+  },
+  {
+    "team": "customer_care",
+    "scope": "NETWORK",
+    "name": "Ayesha Siddiqui",
+    "title": "Customer care duty lead"
+  }
+]

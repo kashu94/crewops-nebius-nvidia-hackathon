@@ -1,0 +1,38 @@
+[
+  {
+    "gate": "BLR-E1",
+    "station": "BLR"
+  },
+  {
+    "gate": "BLR-E2",
+    "station": "BLR"
+  },
+  {
+    "gate": "DEL-E1",
+    "station": "DEL"
+  },
+  {
+    "gate": "BOM-E1",
+    "station": "BOM"
+  },
+  {
+    "gate": "HYD-E1",
+    "station": "HYD"
+  },
+  {
+    "gate": "MAA-E1",
+    "station": "MAA"
+  },
+  {
+    "gate": "CCU-E1",
+    "station": "CCU"
+  },
+  {
+    "gate": "COK-E1",
+    "station": "COK"
+  },
+  {
+    "gate": "GOI-E1",
+    "station": "GOI"
+  }
+]

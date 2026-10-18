@@ -1,0 +1,29 @@
+[
+  {
+    "code": "DX",
+    "name": "Deccan Express",
+    "aircraft": [
+      "VT-DXA",
+      "VT-DXB"
+    ],
+    "color": "#0284c7"
+  },
+  {
+    "code": "KS",
+    "name": "Konkan Skyways",
+    "aircraft": [
+      "VT-DXC",
+      "VT-DXD"
+    ],
+    "color": "#ea580c"
+  },
+  {
+    "code": "NG",
+    "name": "Nilgiri Connect",
+    "aircraft": [
+      "VT-DXE",
+      "VT-DXF"
+    ],
+    "color": "#059669"
+  }
+]
