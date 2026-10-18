@@ -1,0 +1,16 @@
+{
+  "accountLinkingRequest": {
+    "type": "AUTH_CODE",
+    "authorizationUrl": "REPLACE_WITH_AlexaAuthorizeUri",
+    "accessTokenUrl": "REPLACE_WITH_AlexaAccessTokenUri",
+    "clientId": "REPLACE_WITH_AlexaClientId",
+    "clientSecret": "REPLACE_WITH_the_Alexa_client_secret_from_Cognito",
+    "accessTokenScheme": "HTTP_BASIC",
+    "scopes": [
+      "openid",
+      "profile"
+    ],
+    "domains": [],
+    "skipOnEnablement": false
+  }
+}

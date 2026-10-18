@@ -1,0 +1,64 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "crew ops",
+      "intents": [
+        {
+          "name": "WhatsWaitingIntent",
+          "slots": [],
+          "samples": [
+            "what's waiting",
+            "what is waiting",
+            "what's waiting for me",
+            "what is waiting for me",
+            "anything for me",
+            "is anything waiting",
+            "what's on my desk",
+            "what is on my desk",
+            "what needs me",
+            "any updates",
+            "what's new"
+          ]
+        },
+        {
+          "name": "AskCrewOpsIntent",
+          "slots": [
+            {
+              "name": "question",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "tell me {question}",
+            "I want to know {question}",
+            "find out {question}",
+            "check {question}",
+            "question {question}",
+            "look up {question}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": []
+    }
+  }
+}

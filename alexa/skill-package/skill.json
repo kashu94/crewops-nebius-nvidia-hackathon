@@ -1,0 +1,65 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-IN": {
+          "name": "CrewOps",
+          "summary": "Airline crew control: what is waiting on your desk, and legal cover for a sick call.",
+          "description": "CrewOps answers crew-control questions with legally checked, cost-ranked cover, and tells a controller's Echo when a disruption reaches their desk.",
+          "examplePhrases": ["Alexa, open crew ops", "Alexa, ask crew ops what's waiting", "Alexa, ask crew ops tell me who covers P 2291"],
+          "keywords": ["airline", "crew", "operations"]
+        },
+        "en-US": {
+          "name": "CrewOps",
+          "summary": "Airline crew control: what is waiting on your desk, and legal cover for a sick call.",
+          "description": "CrewOps answers crew-control questions with legally checked, cost-ranked cover, and tells a controller's Echo when a disruption reaches their desk.",
+          "examplePhrases": ["Alexa, open crew ops", "Alexa, ask crew ops what's waiting", "Alexa, ask crew ops tell me who covers P 2291"],
+          "keywords": ["airline", "crew", "operations"]
+        },
+        "en-AU": {
+          "name": "CrewOps",
+          "summary": "Airline crew control: what is waiting on your desk, and legal cover for a sick call.",
+          "description": "CrewOps answers crew-control questions with legally checked, cost-ranked cover, and tells a controller's Echo when a disruption reaches their desk.",
+          "examplePhrases": ["Alexa, open crew ops", "Alexa, ask crew ops what's waiting", "Alexa, ask crew ops tell me who covers P 2291"],
+          "keywords": ["airline", "crew", "operations"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["IN", "US", "AU"],
+      "category": "BUSINESS_AND_FINANCE"
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://oa6un33wvciq4taa43x2nzdm4i0vafct.lambda-url.ap-southeast-2.on.aws/",
+          "sslCertificateType": "Wildcard"
+        }
+      }
+    },
+    "permissions": [
+      { "name": "alexa::devices:all:notifications:write" },
+      { "name": "alexa::alerts:reminders:skill:readwrite" }
+    ],
+    "events": {
+      "publications": [{ "eventName": "AMAZON.MessageAlert.Activated" }],
+      "endpoint": {
+        "uri": "https://oa6un33wvciq4taa43x2nzdm4i0vafct.lambda-url.ap-southeast-2.on.aws/",
+        "sslCertificateType": "Wildcard"
+      },
+      "subscriptions": [
+        { "eventName": "SKILL_PROACTIVE_SUBSCRIPTION_CHANGED" },
+        { "eventName": "SKILL_ACCOUNT_LINKED" },
+        { "eventName": "SKILL_DISABLED" }
+      ]
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "locales": { "en-IN": {}, "en-US": {}, "en-AU": {} }
+    }
+  }
+}
