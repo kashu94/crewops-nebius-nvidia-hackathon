@@ -262,7 +262,7 @@ export default function Evaluation() {
                     : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
                 }`}
               >
-                {m === "offline" ? "Rules and templates" : "Live (Nova on Bedrock)"}
+                {m === "offline" ? "Rules and templates" : "Live (NVIDIA Nemotron on Nebius)"}
               </button>
             ))}
           </div>
@@ -365,7 +365,7 @@ export default function Evaluation() {
               <p className="font-semibold text-slate-700">How it is scored</p>A rewording passes when its answer states
               at least 80% of the gold answer&apos;s facts (ids, times, figures), or when the gold question gets no
               factual answer and the rewording reaches the same intent. Every answer is verified again here against its
-              own tool results. Rewordings the rules miss are what the semantic search and Nova are for: the live run
+              own tool results. Rewordings the rules miss are what the semantic search and Nemotron are for: the live run
               measures them.
             </div>
           </div>
