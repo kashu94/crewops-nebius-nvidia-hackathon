@@ -1,9 +1,9 @@
-"""A circuit breaker in front of Bedrock: stop waiting on a model service that is down.
+"""Circuit breakers in front of the model services: stop waiting on one that is down.
 
 Every model call already has a firm timeout and a deterministic fallback, so a failure
-never costs an answer. But while Bedrock is failing (a regional outage, throttling, a
-network drop), each question would still wait out its timeout first, up to ten seconds
-or more, when a voice answer has eight. So after ``threshold`` failures in a row the
+never costs an answer. But while a service is failing (an outage, throttling, a network
+drop), each question would still wait out its timeout first, up to ten seconds or more,
+when a voice answer has eight. So after ``threshold`` failures in a row the
 breaker opens: model calls fail at once for ``cooldown`` seconds and every answer comes
 straight from the roster in DynamoDB through the templates. Then one call is let through
 (half open): success closes the breaker, failure opens it again.
@@ -12,8 +12,10 @@ Only an unavailable service counts: timeouts, lost connections, throttling and 5
 errors. A request the service refuses as invalid is our fault, not an outage, and passes
 through without tripping anything.
 
-One breaker serves the whole process (``MODEL_BREAKER``), so it remembers across the
-periodic rebuilds of the pipeline.
+Two breakers serve the whole process, so they remember across the periodic rebuilds of the
+pipeline: ``MODEL_BREAKER`` for the Nemotron roles on Nebius Token Factory, and
+``BEDROCK_BREAKER`` for the Titan embeddings and the guardrail on Bedrock. Either service
+can be down while the other is up.
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ import threading
 import time
 from collections.abc import Callable
 from typing import Any
+
+from crewops.agent.nebius import NebiusError
 
 OUTAGE_CODES = frozenset(
     {
@@ -57,6 +61,8 @@ def is_outage(exc: BaseException) -> bool:
         ReadTimeoutError | ConnectTimeoutError | EndpointConnectionError | ConnectionClosedError,
     ):
         return True
+    if isinstance(exc, NebiusError):
+        return exc.outage
     if isinstance(exc, ClientError):
         error = exc.response.get("Error", {})
         status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
@@ -123,7 +129,7 @@ class CircuitBreaker:
 
 
 class GuardedClient:
-    """A Bedrock runtime client whose model calls go through a breaker."""
+    """A model client (Nebius or Bedrock) whose model calls go through a breaker."""
 
     def __init__(self, client: Any, breaker: CircuitBreaker) -> None:
         self._client, self._breaker = client, breaker
@@ -147,4 +153,6 @@ class GuardedClient:
 
 
 MODEL_BREAKER = CircuitBreaker()
-"""The process's one breaker for Bedrock."""
+"""The process's breaker for the chat models on Nebius Token Factory. Reported as "models"."""
+BEDROCK_BREAKER = CircuitBreaker()
+"""The process's breaker for Bedrock: Titan embeddings and the guardrail."""
