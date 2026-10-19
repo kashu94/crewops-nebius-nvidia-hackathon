@@ -1,7 +1,7 @@
 """Score the question pipeline on the held-out set.
 
     uv run python -m crewops.agent.evaluate                  # offline: rules and templates
-    uv run python -m crewops.agent.evaluate --live           # Nova, embeddings, guardrail
+    uv run python -m crewops.agent.evaluate --live           # Nemotron, embeddings, guardrail
     uv run python -m crewops.agent.evaluate --json build/evals/offline.json
 
 ``data/eval/heldout.json`` was written after the router rules were final and is never used
@@ -22,9 +22,10 @@ model judges another:
   personal data reached it and had to be removed.
 
 Offline costs nothing. ``--live`` asks 99 questions (each rewording and its gold question,
-and both turns of each follow-up), each with several Bedrock calls (embedding, guardrail
-screening, and triage, advisor or explainer when needed), at Nova's per-token prices; the
-report prints the model calls and tokens used. It reads the deployed table, whose state
+and both turns of each follow-up), each with several model calls: Bedrock for the embedding
+and guardrail screening, and Nemotron on Nebius Token Factory for triage, advisor or
+explainer when needed, all billed per token; the report prints the model calls and tokens
+used. It reads the deployed table, whose state
 demos change, so live agreement compares two live answers rather than fixed ones.
 """
 
@@ -323,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--live", action="store_true", help="Nova, embeddings and guardrail")
+    parser.add_argument("--live", action="store_true", help="Nemotron, embeddings and guardrail")
     parser.add_argument("--json", type=Path, help="also write the full report here")
     args = parser.parse_args(argv)
 

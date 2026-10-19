@@ -7,9 +7,10 @@
 
 Without ``--live`` it answers from the seed files, with no AWS calls. With ``--live`` it reads
 the operation from DynamoDB (so open disruptions count), uses the intents index for the
-router's semantic stage, and calls the Nova models (triage, advisor, explainer) and the
-guardrail when ``CREWOPS_GUARDRAIL_ID`` is set; ``--no-model`` leaves the models out. The
-AWS profile comes from ``.env``.
+router's semantic stage, and calls NVIDIA Nemotron on Nebius Token Factory (triage, advisor,
+explainer) and the guardrail when ``CREWOPS_GUARDRAIL_ID`` is set; ``--no-model`` leaves the
+models out. The AWS profile comes from ``.env``; the Nebius key from ``NEBIUS_API_KEY`` or
+Parameter Store (``crewops.agent.nebius``).
 """
 
 from __future__ import annotations
