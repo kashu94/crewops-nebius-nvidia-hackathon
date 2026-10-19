@@ -1,0 +1,275 @@
+"""NVIDIA Nemotron on Nebius Token Factory: the Converse <-> chat completions translation,
+errors and the breaker, the API key, and the advisor's tool loop end to end (no network)."""
+
+import io
+import json
+import urllib.error
+
+import boto3
+import pytest
+from agent_fixtures import examples, tools, vocab
+
+from crewops.agent.breaker import CircuitBreaker, GuardedClient, is_outage
+from crewops.agent.models import ModelAdvisor, ModelExplainer
+from crewops.agent.nebius import (
+    NEMOTRON_70B,
+    NebiusClient,
+    NebiusError,
+    NebiusUnavailable,
+    api_key,
+    from_chat_response,
+    to_chat_request,
+)
+from crewops.agent.pipeline import Pipeline
+from crewops.agent.router import Router
+from crewops.domain import Role
+from crewops.tools import Caller, bedrock_tool_config
+
+CONTROLLER = Caller("u-ctl", frozenset({Role.CONTROLLER}))
+UNPLANNED = "Which single flight leg has the most seats at risk if cancelled, and why?"
+SEATS = {"entity": "flights", "sort_by": "seats", "sort_desc": True, "limit": 3}
+
+
+def chat_text(text, finish="stop"):
+    return {
+        "choices": [{"message": {"role": "assistant", "content": text}, "finish_reason": finish}],
+        "usage": {"prompt_tokens": 120, "completion_tokens": 30},
+    }
+
+
+def chat_tool(name, args, call_id="call-1", finish="tool_calls"):
+    call = {"id": call_id, "type": "function", "function": {"name": name, "arguments": args}}
+    return {
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": None, "tool_calls": [call]},
+                "finish_reason": finish,
+            }
+        ],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 12},
+    }
+
+
+class Response(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class FakeTokenFactory:
+    """Stands in for ``urllib.request.urlopen``: answers from a script, keeps each request."""
+
+    def __init__(self, replies=()):
+        self.replies = list(replies)
+        self.requests = []
+
+    def __call__(self, request, timeout=None):
+        body = json.loads(request.data) if request.data else None
+        self.requests.append(
+            {"url": request.full_url, "headers": dict(request.headers), "body": body}
+        )
+        reply = self.replies.pop(0)
+        if isinstance(reply, BaseException):
+            raise reply
+        return Response(json.dumps(reply).encode())
+
+
+def http_error(status, payload):
+    return urllib.error.HTTPError(
+        "https://api.tokenfactory.nebius.com/v1/chat/completions",
+        status,
+        "error",
+        {},
+        io.BytesIO(json.dumps(payload).encode()),
+    )
+
+
+# -- Converse -> chat completions --------------------------------------------------------
+
+
+def test_a_converse_request_becomes_a_chat_completion():
+    messages = [
+        {"role": "user", "content": [{"text": "Who covers P-2291?"}]},
+        {
+            "role": "assistant",
+            "content": [{"toolUse": {"toolUseId": "planned-0", "name": "lookup", "input": SEATS}}],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "planned-0",
+                        "content": [{"text": '{"rows": []}'}],
+                        "status": "success",
+                    }
+                }
+            ],
+        },
+    ]
+    body = to_chat_request(
+        NEMOTRON_70B,
+        [{"text": "You are CrewOps."}],
+        messages,
+        {"maxTokens": 800, "temperature": 0},
+        bedrock_tool_config({"lookup"}),
+    )
+    assert body["model"] == NEMOTRON_70B
+    assert body["max_tokens"] == 800 and body["temperature"] == 0
+    roles = [m["role"] for m in body["messages"]]
+    assert roles == ["system", "user", "assistant", "tool"]
+    call = body["messages"][2]["tool_calls"][0]
+    assert call["id"] == "planned-0" and json.loads(call["function"]["arguments"]) == SEATS
+    assert body["messages"][3] == {
+        "role": "tool",
+        "tool_call_id": "planned-0",
+        "content": '{"rows": []}',
+    }
+    (tool,) = body["tools"]
+    assert tool["type"] == "function" and tool["function"]["name"] == "lookup"
+    assert tool["function"]["parameters"]["type"] == "object"
+    assert body["tool_choice"] == "auto"
+
+
+def test_no_tools_means_no_tool_fields():
+    body = to_chat_request(
+        NEMOTRON_70B, None, [{"role": "user", "content": [{"text": "q"}]}], {}, None
+    )
+    assert "tools" not in body and "tool_choice" not in body
+    assert body["messages"] == [{"role": "user", "content": "q"}]
+
+
+# -- chat completions -> Converse --------------------------------------------------------
+
+
+def test_a_finished_reply_reads_as_end_turn_with_usage():
+    out = from_chat_response(chat_text("D. Reddy (C-3310) covers P-2291."))
+    assert out["stopReason"] == "end_turn"
+    assert out["output"]["message"]["content"] == [{"text": "D. Reddy (C-3310) covers P-2291."}]
+    assert out["usage"] == {"inputTokens": 120, "outputTokens": 30}
+
+
+@pytest.mark.parametrize("finish", ["tool_calls", "stop"])
+def test_tool_calls_read_as_tool_use_whatever_the_finish_reason(finish):
+    out = from_chat_response(chat_tool("lookup", json.dumps(SEATS), finish=finish))
+    assert out["stopReason"] == "tool_use"
+    (block,) = out["output"]["message"]["content"]
+    assert block["toolUse"] == {"toolUseId": "call-1", "name": "lookup", "input": SEATS}
+
+
+@pytest.mark.parametrize("args", ["{not json", "[1, 2]"])
+def test_a_malformed_tool_call_is_no_answer(args):
+    assert from_chat_response(chat_tool("lookup", args))["stopReason"] == "malformed_tool_use"
+
+
+@pytest.mark.parametrize(
+    ("finish", "stop"), [("length", "max_tokens"), ("content_filter", "content_filtered")]
+)
+def test_a_cut_or_filtered_reply_keeps_its_reason(finish, stop):
+    assert from_chat_response(chat_text("half", finish))["stopReason"] == stop
+
+
+# -- The client, errors and the breaker --------------------------------------------------
+
+
+def test_the_client_posts_to_token_factory_with_the_key():
+    wire = FakeTokenFactory([chat_text("ok")])
+    client = NebiusClient("nb-secret", "https://api.tokenfactory.nebius.com/v1", opener=wire)
+    out = client.converse(
+        modelId=NEMOTRON_70B,
+        messages=[{"role": "user", "content": [{"text": "hi"}]}],
+        inferenceConfig={"maxTokens": 10},
+    )
+    assert out["stopReason"] == "end_turn"
+    (request,) = wire.requests
+    assert request["url"] == "https://api.tokenfactory.nebius.com/v1/chat/completions"
+    assert request["headers"]["Authorization"] == "Bearer nb-secret"
+    assert request["body"]["model"] == NEMOTRON_70B
+
+
+@pytest.mark.parametrize(
+    ("status", "outage"), [(429, True), (503, True), (400, False), (401, False)]
+)
+def test_http_errors_trip_the_breaker_only_when_the_service_is_down(status, outage):
+    wire = FakeTokenFactory([http_error(status, {"detail": "nope"})])
+    client = NebiusClient("k", opener=wire)
+    with pytest.raises(NebiusError) as caught:
+        client.converse(modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}])
+    assert caught.value.status == status and "nope" in str(caught.value)
+    assert is_outage(caught.value) is outage
+
+
+def test_an_unreachable_service_is_an_outage_and_opens_the_breaker():
+    breaker = CircuitBreaker(threshold=2)
+    wire = FakeTokenFactory([urllib.error.URLError("timed out")] * 2)
+    client = GuardedClient(NebiusClient("k", opener=wire), breaker)
+    for _ in range(2):
+        with pytest.raises(NebiusUnavailable):
+            client.converse(modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}])
+    assert breaker.state == "open"
+
+
+def test_the_model_catalogue_is_listed():
+    wire = FakeTokenFactory([{"data": [{"id": NEMOTRON_70B}, {"id": "meta-llama/x"}]}])
+    assert NebiusClient("k", opener=wire).list_models() == ["meta-llama/x", NEMOTRON_70B]
+    assert wire.requests[0]["url"].endswith("/v1/models")
+
+
+# -- The roles, end to end through the translation ---------------------------------------
+
+
+def test_the_advisor_runs_its_tool_loop_on_nemotron_and_is_verified():
+    wire = FakeTokenFactory(
+        [
+            chat_tool("lookup", json.dumps(SEATS)),
+            chat_text("DX401 on 2026-10-12 has the most seats at risk: 162."),
+        ]
+    )
+    advisor = ModelAdvisor(NebiusClient("k", opener=wire), NEMOTRON_70B, tools())
+    pipeline = Pipeline(tools(), Router(vocab(), examples()), drafter=advisor)
+    answer = pipeline.answer(UNPLANNED, CONTROLLER)
+    assert answer.source == "model" and answer.verification.ok
+    assert [e.tool for e in answer.trace] == ["lookup"]
+    second = wire.requests[1]["body"]["messages"]
+    assert [m["role"] for m in second] == ["system", "user", "assistant", "tool"]
+    assert second[3]["tool_call_id"] == "call-1" and '"seats": 162' in second[3]["content"]
+    assert advisor.last.usage.calls == 2 and advisor.last.usage.input_tokens == 220
+
+
+def test_an_invented_figure_from_nemotron_falls_back_to_the_template():
+    wire = FakeTokenFactory(
+        [chat_tool("lookup", json.dumps(SEATS)), chat_text("DX401 has 999 seats at risk.")]
+    )
+    advisor = ModelAdvisor(NebiusClient("k", opener=wire), NEMOTRON_70B, tools())
+    answer = Pipeline(tools(), Router(vocab(), examples()), drafter=advisor).answer(
+        UNPLANNED, CONTROLLER
+    )
+    assert answer.source == "template" and "999" not in answer.text
+
+
+def test_a_token_factory_outage_still_gets_an_answer():
+    wire = FakeTokenFactory([http_error(503, {"detail": "overloaded"})])
+    explainer = ModelExplainer(NebiusClient("k", opener=wire), NEMOTRON_70B)
+    pipeline = Pipeline(tools(), Router(vocab(), examples()), polisher=explainer)
+    answer = pipeline.answer("Can C-3310 cover P-2291?", CONTROLLER)
+    assert answer.source == "template" and answer.verification.ok
+
+
+# -- The API key ------------------------------------------------------------------------
+
+
+def test_the_key_comes_from_the_environment_first():
+    env = {"NEBIUS_API_KEY": " nb-local "}
+    assert api_key("/crewops-test/nebius/api-key", "ap-southeast-2", env) == "nb-local"
+
+
+def test_the_deployed_key_comes_from_parameter_store(moto_aws):
+    ssm = boto3.client("ssm", region_name="ap-southeast-2")
+    ssm.put_parameter(Name="/crewops-test/nebius/api-key", Value="nb-ssm", Type="SecureString")
+    assert api_key("/crewops-test/nebius/api-key", "ap-southeast-2", {}) == "nb-ssm"
+
+
+def test_no_key_anywhere_means_no_models(moto_aws):
+    assert api_key("/crewops-test/nebius/api-key", "ap-southeast-2", {}) is None
