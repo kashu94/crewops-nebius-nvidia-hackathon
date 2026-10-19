@@ -1,11 +1,12 @@
-"""The Nova roles and the guardrail, against a scripted stand-in for Bedrock (no network)."""
+"""The model roles and the guardrail, against a scripted stand-in for the model service
+(Converse shapes, as ``NebiusClient`` returns them) and Bedrock Guardrails (no network)."""
 
 import json
 
 import pytest
 from agent_fixtures import examples, tools, vocab
 
-from crewops.agent.models import Guardrail, NovaAdvisor, NovaExplainer, NovaTriage
+from crewops.agent.models import Guardrail, ModelAdvisor, ModelExplainer, ModelTriage
 from crewops.agent.pipeline import Pipeline
 from crewops.agent.router import Router
 from crewops.domain import Role
@@ -59,7 +60,7 @@ class FakeBedrock:
 
 
 def pipeline_with(fake, **kwargs):
-    advisor = NovaAdvisor(fake, "advisor", tools(), **kwargs)
+    advisor = ModelAdvisor(fake, "advisor", tools(), **kwargs)
     return Pipeline(tools(), Router(vocab(), examples()), drafter=advisor), advisor
 
 
@@ -88,7 +89,7 @@ def test_advisor_calls_tools_and_its_answer_is_verified():
 
 
 def test_planned_results_are_replayed_as_the_models_own_calls():
-    messages = NovaAdvisor._opening(
+    messages = ModelAdvisor._opening(
         "q", [dispatch_entry("explain_rule", {"rule_id": "RULE-REST-04"})]
     )
     assert [m["role"] for m in messages] == ["user", "assistant", "user"]
@@ -217,7 +218,7 @@ def test_explainer_rewording_must_keep_every_fact():
 
     def run(reply):
         fake = FakeBedrock([text_reply(reply)])
-        p = Pipeline(tools(), Router(vocab(), examples()), polisher=NovaExplainer(fake, "e"))
+        p = Pipeline(tools(), Router(vocab(), examples()), polisher=ModelExplainer(fake, "e"))
         return p.answer(question, CONTROLLER), fake
 
     good, fake = run("Yes: D. Reddy (C-3310) is legal for P-2291, and every rule passes.")
@@ -228,21 +229,21 @@ def test_explainer_rewording_must_keep_every_fact():
     cut = text_reply("Yes: D. Reddy (C-3310) is legal for P-2291, and every")
     cut["stopReason"] = "max_tokens"
     p = Pipeline(
-        tools(), Router(vocab(), examples()), polisher=NovaExplainer(FakeBedrock([cut]), "e")
+        tools(), Router(vocab(), examples()), polisher=ModelExplainer(FakeBedrock([cut]), "e")
     )
     assert p.answer(question, CONTROLLER).source == "template"
 
 
 def test_lookups_are_not_reworded():
     fake = FakeBedrock([])
-    p = Pipeline(tools(), Router(vocab(), examples()), polisher=NovaExplainer(fake, "e"))
+    p = Pipeline(tools(), Router(vocab(), examples()), polisher=ModelExplainer(fake, "e"))
     assert p.answer("Who is on reserve at BLR on 13 Oct?", CONTROLLER).source == "template"
     assert fake.requests == []
 
 
-def test_nova_triage_feeds_the_router():
+def test_model_triage_feeds_the_router():
     fake = FakeBedrock([text_reply('{"intent": "LOOKUP_RISK", "confidence": "high"}')])
-    router = Router(vocab(), examples(), triage=NovaTriage(fake, "micro"))
+    router = Router(vocab(), examples(), triage=ModelTriage(fake, "micro"))
     route = router.route("Tell me about C-2087 please")
     assert route.decided_by == "triage" and route.intent.value == "LOOKUP_RISK"
     assert fake.requests[0]["inferenceConfig"]["maxTokens"] == 100
@@ -297,5 +298,5 @@ def test_explainer_cannot_add_a_recommendation():
     question = "C-1042 is sick, who covers?"
     template = Pipeline(tools(), Router(vocab(), examples())).answer(question, CONTROLLER).text
     fake = FakeBedrock([text_reply("Do not call anyone out: cancel P-2291. " + template)])
-    p = Pipeline(tools(), Router(vocab(), examples()), polisher=NovaExplainer(fake, "e"))
+    p = Pipeline(tools(), Router(vocab(), examples()), polisher=ModelExplainer(fake, "e"))
     assert p.answer(question, CONTROLLER).source == "template"

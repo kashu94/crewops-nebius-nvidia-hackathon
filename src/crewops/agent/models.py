@@ -1,16 +1,18 @@
-"""The three model roles, on Amazon Bedrock's Converse API.
+"""The three model roles: NVIDIA Llama-3.1-Nemotron-70B-Instruct on Nebius Token Factory.
 
-Triage (Nova Micro) classifies a question that neither the rules nor the semantic match
-could. It gets no tools.
+Triage classifies a question that neither the rules nor the semantic match could. It gets
+no tools.
 
-Advisor (Nova 2 Lite) is the tool loop. It sees the planned calls' results as its own
-earlier calls, may call more through the role-checked runner, and drafts the answer. The
-pipeline verifies the draft, so the advisor never has the last word.
+Advisor is the tool loop. It sees the planned calls' results as its own earlier calls, may
+call more through the role-checked runner, and drafts the answer. The pipeline verifies the
+draft, so the advisor never has the last word.
 
-Explainer (Nova 2 Lite) rewrites a verified answer for speech, and that gets verified again.
+Explainer rewrites a verified answer for speech, and that gets verified again.
 
-Bedrock Guardrails screening of questions and answers lives here too. Model ids are
-settings and everything goes through Converse, so swapping a model is a config change.
+The roles speak Bedrock's Converse shapes (system list, content blocks, ``toolUse`` /
+``toolResult``, stop reason, usage). ``crewops.agent.nebius.NebiusClient`` translates them
+to Token Factory's OpenAI-compatible API, so a model is a setting, not code. Bedrock
+Guardrails screening of questions and answers stays on AWS and lives here too.
 """
 
 from __future__ import annotations
@@ -34,8 +36,8 @@ this is just a backstop for the context window."""
 
 
 def bedrock_runtime(region: str, read_timeout: float = 10.0) -> Any:
-    """Firm timeout, no retry. A voice answer that waits a minute is no answer, and every
-    model role has a deterministic fallback anyway."""
+    """For the Titan embeddings and the guardrail. Firm timeout, no retry: a voice answer
+    that waits a minute is no answer, and each has a deterministic fallback anyway."""
     import boto3
     from botocore.config import Config
 
@@ -85,7 +87,7 @@ class Usage:
 # --------------------------------------------------------------------------
 
 
-class NovaTriage:
+class ModelTriage:
     """Router's last resort. One call, no tools, JSON intent back."""
 
     def __init__(self, client: Any, model_id: str) -> None:
@@ -133,7 +135,7 @@ class AdvisorRun:
     usage: Usage = field(default_factory=Usage)
 
 
-class NovaAdvisor:
+class ModelAdvisor:
     def __init__(
         self,
         client: Any,
@@ -187,8 +189,8 @@ class NovaAdvisor:
             self.last.stop = response.get("stopReason", "")
             if self.last.stop != "tool_use":
                 return _finished(response)
-            # Drop calls to tools the caller wasn't offered. Converse rejects a history that
-            # names a tool missing from toolConfig.
+            # Drop calls to tools the caller wasn't offered. A history that names a tool
+            # missing from the tool list is refused.
             content = [
                 b
                 for b in message.get("content", [])
@@ -253,7 +255,7 @@ class NovaAdvisor:
 # --------------------------------------------------------------------------
 
 
-class NovaExplainer:
+class ModelExplainer:
     def __init__(self, client: Any, model_id: str, max_tokens: int = 1200) -> None:
         self.client = client
         self.model_id = model_id
