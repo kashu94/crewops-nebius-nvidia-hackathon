@@ -28,7 +28,12 @@ from crewops.config import Settings
 from crewops.search.vectors import INDEXES
 from crewops_infra.auth_stack import AuthStack
 from crewops_infra.guardrail_stack import GuardrailStack
-from crewops_infra.mcp_stack import PACKAGE, model_arns
+from crewops_infra.mcp_stack import (
+    PACKAGE,
+    model_arns,
+    model_environment,
+    nebius_key_statement,
+)
 
 
 class AlexaStack(Stack):
@@ -70,11 +75,7 @@ class AlexaStack(Stack):
                 "CREWOPS_ALEXA_CLIENT_ID": auth.alexa_client.user_pool_client_id,
                 "CREWOPS_GUARDRAIL_ID": guardrail.guardrail.attr_guardrail_id,
                 "CREWOPS_GUARDRAIL_VERSION": guardrail.version.attr_version,
-                "CREWOPS_ROUTER_MODEL_ID": settings.router_model_id,
-                "CREWOPS_ADVISOR_MODEL_ID": settings.advisor_model_id,
-                "CREWOPS_EXPLAINER_MODEL_ID": settings.explainer_model_id,
-                "CREWOPS_EMBEDDING_MODEL_ID": settings.embedding_model_id,
-                "CREWOPS_EMBEDDING_DIMENSIONS": str(settings.embedding_dimensions),
+                **model_environment(settings),
                 "CREWOPS_ROUTER_SEMANTIC_FLOOR": str(settings.router_semantic_floor),
                 "CREWOPS_RESPONSE_BUDGET_SECONDS": str(settings.response_budget_seconds),
                 "CREWOPS_MAX_TOOL_ITERATIONS": str(settings.max_tool_iterations),
@@ -89,18 +90,13 @@ class AlexaStack(Stack):
         # Reads the operation and answers; writes only linked accounts and conversation-free
         # state (it files no reports and decides no plans).
         table.grant_read_write_data(self.skill)
-        models = {
-            settings.router_model_id,
-            settings.advisor_model_id,
-            settings.explainer_model_id,
-            settings.embedding_model_id,
-        }
         self.skill.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel"],
-                resources=sorted({a for m in models for a in model_arns(m, region, account)}),
+                resources=model_arns(settings.embedding_model_id, region, account),
             )
         )
+        self.skill.add_to_role_policy(nebius_key_statement(settings, region, account))
         self.skill.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock:ApplyGuardrail"],

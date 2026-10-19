@@ -1,8 +1,8 @@
 """Runtime settings, read once from the environment.
 
 All AWS resource names hang off the stage name, so ``dev``, ``demo`` and ``prod`` can live
-side by side and no name is typed in two places. This module never calls AWS, it only works
-out which resources and models everything else uses.
+side by side and no name is typed in two places. This module never calls AWS or Nebius, it
+only works out which resources and models everything else uses.
 
 Empty env vars count as unset, so ``CREWOPS_GUARDRAIL_ID=`` in ``.env`` means "no guardrail
 yet" rather than a guardrail called ''.
@@ -22,16 +22,19 @@ take lowercase letters, digits and hyphens."""
 TITAN_V2_DIMENSIONS = (256, 512, 1024)
 
 DEFAULT_REGION = "ap-southeast-2"
-"""Sydney. Everything we use is available there, including S3 Vectors, AgentCore and the
-Nova and Titan models on Bedrock."""
+"""Sydney. Everything we use on AWS is available there, including S3 Vectors, AgentCore,
+Bedrock Guardrails and the Titan embedding model."""
 
-# Nova on Bedrock. These ids work in any region that offers the model, so switching
-# AWS_REGION won't quietly break model calls. Nova Micro runs in-region without a profile
-# prefix. Nova 2 Lite has no in-region endpoint and needs the global cross-region profile.
-# Any Converse model with tool calling can be swapped in through the environment.
-DEFAULT_ROUTER_MODEL = "amazon.nova-micro-v1:0"
-DEFAULT_ADVISOR_MODEL = "global.amazon.nova-2-lite-v1:0"
-DEFAULT_EXPLAINER_MODEL = "global.amazon.nova-2-lite-v1:0"
+# The three chat roles (triage, advisor, explainer) run NVIDIA Llama-3.1-Nemotron-70B-Instruct
+# on Nebius Token Factory, through its OpenAI-compatible API (crewops.agent.nebius). Any
+# Token Factory model with tool calling can be swapped in through the environment; check
+# what a key can use with ``python -m crewops.agent.nebius``.
+DEFAULT_NEBIUS_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
+DEFAULT_ROUTER_MODEL = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+DEFAULT_ADVISOR_MODEL = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+DEFAULT_EXPLAINER_MODEL = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+# Embeddings stay on Bedrock: the S3 Vectors indexes were built with Titan V2, and a query
+# must be embedded by the model that built the index.
 DEFAULT_EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
 
 
@@ -162,6 +165,13 @@ def _events_stage(env: Mapping[str, str]) -> str:
     return stage
 
 
+def _base_url(env: Mapping[str, str]) -> str:
+    url = _get(env, "CREWOPS_NEBIUS_BASE_URL", DEFAULT_NEBIUS_BASE_URL)
+    if not re.match(r"^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[^\s]*)?$", url):
+        raise ConfigError(f"CREWOPS_NEBIUS_BASE_URL must be an https URL, got {url!r}")
+    return url
+
+
 def _fraction(env: Mapping[str, str], key: str, default: float) -> float:
     value = _float(env, key, default)
     if value >= 1:
@@ -175,9 +185,11 @@ class Settings:
     aws_region: str
 
     router_model_id: str
+    """Triage, advisor and explainer: Nebius Token Factory model ids."""
     advisor_model_id: str
     explainer_model_id: str
     embedding_model_id: str
+    """Bedrock model id."""
     embedding_dimensions: int
 
     guardrail_id: str | None
@@ -226,6 +238,9 @@ class Settings:
     push_enabled: bool = False
     """The stack only turns this on when the notifier ships the MCP package, because that's
     the one bundling ``cryptography`` for web push."""
+    nebius_base_url: str = DEFAULT_NEBIUS_BASE_URL
+    """Token Factory's OpenAI-compatible API. The key is never a setting: it comes from
+    ``NEBIUS_API_KEY`` locally or from Parameter Store (``nebius_api_key_parameter``)."""
 
     # -- Derived resource names ---------------------------------------------
 
@@ -315,6 +330,11 @@ class Settings:
         return f"/{self.prefix}/push"
 
     @property
+    def nebius_api_key_parameter(self) -> str:
+        """SecureString holding the Nebius Token Factory API key, created by hand."""
+        return f"/{self.prefix}/nebius/api-key"
+
+    @property
     def guardrails_enabled(self) -> bool:
         return self.guardrail_id is not None
 
@@ -363,6 +383,7 @@ class Settings:
             escalation_function_arn=_get(env, "CREWOPS_ESCALATION_FUNCTION_ARN"),
             escalation_role_arn=_get(env, "CREWOPS_ESCALATION_ROLE_ARN"),
             push_enabled=_get(env, "CREWOPS_PUSH_ENABLED") == "1",
+            nebius_base_url=_base_url(env),
         )
 
 

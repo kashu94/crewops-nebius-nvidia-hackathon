@@ -13,8 +13,8 @@ TEST_SETTINGS = Settings.from_env({"CREWOPS_STAGE": "test", "AWS_REGION": "ap-so
 
 @pytest.fixture
 def moto_aws(monkeypatch):
-    """Fake credentials and an in-memory AWS. Real profiles are never consulted."""
-    for key in ("AWS_PROFILE", "AWS_DEFAULT_PROFILE"):
+    """Fake credentials and an in-memory AWS. Real profiles and keys are never consulted."""
+    for key in ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "NEBIUS_API_KEY", "CREWOPS_NEBIUS_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")

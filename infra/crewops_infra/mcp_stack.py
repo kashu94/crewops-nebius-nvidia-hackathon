@@ -10,11 +10,15 @@ again and acts as that user.
 Memory is short-term events only, kept seven days (the minimum). We only need each
 conversation's previous turn so a follow-up question makes sense.
 
-The execution role gets the table, the ingest queue, the configured Nova and Titan models,
-the guardrail, the search indexes, conversation events, and subscribe/unsubscribe on the
-alert topic for the admin alert tools. Nothing else. Its name is fixed
-(``crewops-<stage>-mcp-runtime``) because the ingest queue's policy, over in the ingestion
-stack, refuses reports from anyone but this role and the ARNs in ``CREWOPS_QUEUE_SENDERS``.
+The execution role gets the table, the ingest queue, the Titan embedding model, the
+guardrail, the search indexes, conversation events, subscribe/unsubscribe on the alert topic
+for the admin alert tools, and the one Parameter Store value holding the Nebius Token
+Factory API key. Nothing else. The chat models (NVIDIA Nemotron) run on Token Factory, so
+there is no Bedrock permission for them; the runtime reaches Token Factory over HTTPS.
+
+The role's name is fixed (``crewops-<stage>-mcp-runtime``) because the ingest queue's
+policy, over in the ingestion stack, refuses reports from anyone but this role and the ARNs
+in ``CREWOPS_QUEUE_SENDERS``.
 
 Billed per second while a session is active. Idle sessions end after five minutes.
 """
@@ -54,6 +58,27 @@ def model_arns(model_id: str, region: str, account: str) -> list[str]:
             f"arn:aws:bedrock:::foundation-model/{base}",
         ]
     return [f"arn:aws:bedrock:{region}::foundation-model/{model_id}"]
+
+
+def nebius_key_statement(settings: Settings, region: str, account: str) -> iam.PolicyStatement:
+    """Read the Token Factory API key (a SecureString encrypted with the account's default
+    ``aws/ssm`` key, whose policy lets Parameter Store decrypt for anyone allowed to read)."""
+    return iam.PolicyStatement(
+        actions=["ssm:GetParameter"],
+        resources=[f"arn:aws:ssm:{region}:{account}:parameter{settings.nebius_api_key_parameter}"],
+    )
+
+
+def model_environment(settings: Settings) -> dict[str, str]:
+    """Which models answer, and where: the same for the MCP server and the Alexa skill."""
+    return {
+        "CREWOPS_NEBIUS_BASE_URL": settings.nebius_base_url,
+        "CREWOPS_ROUTER_MODEL_ID": settings.router_model_id,
+        "CREWOPS_ADVISOR_MODEL_ID": settings.advisor_model_id,
+        "CREWOPS_EXPLAINER_MODEL_ID": settings.explainer_model_id,
+        "CREWOPS_EMBEDDING_MODEL_ID": settings.embedding_model_id,
+        "CREWOPS_EMBEDDING_DIMENSIONS": str(settings.embedding_dimensions),
+    }
 
 
 class McpStack(Stack):
@@ -132,11 +157,7 @@ class McpStack(Stack):
                 "CREWOPS_ALERTS_TOPIC_ARN": notify.topic.topic_arn,
                 "CREWOPS_GUARDRAIL_ID": guardrail.guardrail.attr_guardrail_id,
                 "CREWOPS_GUARDRAIL_VERSION": guardrail.version.attr_version,
-                "CREWOPS_ROUTER_MODEL_ID": settings.router_model_id,
-                "CREWOPS_ADVISOR_MODEL_ID": settings.advisor_model_id,
-                "CREWOPS_EXPLAINER_MODEL_ID": settings.explainer_model_id,
-                "CREWOPS_EMBEDDING_MODEL_ID": settings.embedding_model_id,
-                "CREWOPS_EMBEDDING_DIMENSIONS": str(settings.embedding_dimensions),
+                **model_environment(settings),
                 "CREWOPS_ROUTER_SEMANTIC_FLOOR": str(settings.router_semantic_floor),
                 "CREWOPS_RESPONSE_BUDGET_SECONDS": str(settings.response_budget_seconds),
                 "CREWOPS_MAX_TOOL_ITERATIONS": str(settings.max_tool_iterations),
@@ -145,18 +166,13 @@ class McpStack(Stack):
 
         table.grant_read_write_data(self.runtime)
         queue.grant_send_messages(self.runtime)
-        models = {
-            settings.router_model_id,
-            settings.advisor_model_id,
-            settings.explainer_model_id,
-            settings.embedding_model_id,
-        }
         self.runtime.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel"],
-                resources=sorted({a for m in models for a in model_arns(m, region, account)}),
+                resources=model_arns(settings.embedding_model_id, region, account),
             )
         )
+        self.runtime.add_to_role_policy(nebius_key_statement(settings, region, account))
         self.runtime.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock:ApplyGuardrail"],

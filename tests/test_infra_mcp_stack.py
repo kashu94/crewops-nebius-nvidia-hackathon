@@ -66,6 +66,9 @@ def test_runtime_speaks_mcp_behind_the_cognito_authorizer(template):
         "CREWOPS_GUARDRAIL_VERSION",
     ):
         assert key in env, key
+    assert env["CREWOPS_NEBIUS_BASE_URL"] == "https://api.tokenfactory.nebius.com/v1/"
+    assert env["CREWOPS_ADVISOR_MODEL_ID"] == "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+    assert not any("API_KEY" in k for k in env)  # the key is read from Parameter Store
     assert p["LifecycleConfiguration"]["IdleRuntimeSessionTimeout"] == 300
 
 
@@ -83,9 +86,11 @@ def test_permissions_are_only_what_the_server_needs(template):
         for a in actions:
             by_action.setdefault(a, []).append(s["Resource"])
     invoke = json.dumps(by_action["bedrock:InvokeModel"])
-    assert "inference-profile/global.amazon.nova-2-lite-v1:0" in invoke
-    assert "foundation-model/amazon.nova-micro-v1:0" in invoke
+    # Chat models run on Nebius Token Factory: Bedrock is only asked for embeddings.
+    assert invoke.count("foundation-model/") == 1
     assert "foundation-model/amazon.titan-embed-text-v2:0" in invoke
+    ssm = json.dumps(by_action["ssm:GetParameter"])
+    assert "parameter/crewops-dev/nebius/api-key" in ssm and "*" not in ssm
     assert "bedrock:ApplyGuardrail" in by_action
     assert "s3vectors:QueryVectors" in by_action and "sqs:SendMessage" in by_action
     assert "dynamodb:PutItem" in by_action

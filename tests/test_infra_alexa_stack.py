@@ -70,7 +70,14 @@ def test_the_skill_is_a_public_https_endpoint_that_verifies_alexa(stacks):
     assert env["CREWOPS_ALEXA_SKILL_ID"] == "amzn1.ask.skill.test"
     assert env["CREWOPS_DATA_DIR"] == "/var/task/data" and "CREWOPS_ALEXA_CLIENT_ID" in env
     assert skill["Timeout"] <= 10
+    assert env["CREWOPS_NEBIUS_BASE_URL"].startswith("https://api.tokenfactory.nebius.com/")
     t.has_output("SkillEndpointUrl", {})
+
+
+def test_the_skill_reads_the_nebius_key_and_embeds_with_titan_only(stacks):
+    policy = json.dumps(stacks["alexa"].find_resources("AWS::IAM::Policy"))
+    assert "parameter/crewops-dev/nebius/api-key" in policy
+    assert policy.count("foundation-model/") == 1 and "titan-embed-text-v2" in policy
 
 
 def test_account_linking_has_its_own_client_with_alexas_redirects(stacks):
