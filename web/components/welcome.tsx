@@ -28,12 +28,18 @@ export function WelcomeBack() {
     let saved: string | null = null;
     try {
       saved = sessionStorage.getItem("crewops-welcome");
-      sessionStorage.removeItem("crewops-welcome");
     } catch {
       saved = null;
     }
     if (!saved) return;
     const t = setTimeout(() => {
+      // Removed only once shown: React's development double run cancels the first timer, and
+      // removing it earlier left the second run with nothing to show.
+      try {
+        sessionStorage.removeItem("crewops-welcome");
+      } catch {
+        // shown again on the next page load at worst
+      }
       try {
         const w = JSON.parse(saved) as Welcome;
         if (w.alerts?.length) setData(w);
@@ -81,12 +87,12 @@ export function WelcomeBack() {
   return (
     <aside
       role="status"
-      className="animate-rise fixed right-4 top-20 z-40 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-sky-200 bg-white/95 p-4 shadow-2xl backdrop-blur"
+      className="fixed right-4 top-20 z-40 w-[min(26rem,calc(100vw-2rem))] rounded-lg border border-[#cfe0ef] bg-white/95 p-4 shadow-2xl"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">While you were away</p>
-          <p className="mt-0.5 text-sm text-slate-700">
+          <p className="text-[11px] font-semibold text-[#173f63]">While you were away</p>
+          <p className="mt-0.5 text-sm text-foreground">
             {data.alerts.length} update{data.alerts.length === 1 ? "" : "s"} since you last had CrewOps open
           </p>
         </div>
@@ -94,7 +100,7 @@ export function WelcomeBack() {
           type="button"
           onClick={() => setData(null)}
           aria-label="Dismiss"
-          className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          className="rounded-full p-1 text-muted hover:bg-sunken hover:text-foreground"
         >
           <X size={15} />
         </button>
@@ -104,15 +110,15 @@ export function WelcomeBack() {
           <li key={a.id}>
             <Link
               href={`/console/${encodeURIComponent(a.disruption_id)}`}
-              className="block rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-sky-300 hover:bg-sky-50/50"
+              className="block rounded-md border border-line px-3 py-2 text-sm hover:border-[#cfe0ef] hover:bg-accent-soft/50"
             >
               <span className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-slate-800">{a.title}</span>
-                <span className="font-mono text-[11px] text-slate-400">
+                <span className="font-semibold text-foreground">{a.title}</span>
+                <span className="font-mono text-[11px] text-muted">
                   {a.at.slice(5, 10)} {a.at.slice(11, 16)}Z
                 </span>
               </span>
-              <span className="mt-0.5 block text-xs text-slate-600">{a.text}</span>
+              <span className="mt-0.5 block text-xs text-muted">{a.text}</span>
             </Link>
           </li>
         ))}
@@ -121,7 +127,7 @@ export function WelcomeBack() {
         type="button"
         onClick={play}
         disabled={playing}
-        className="mt-3 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+        className="mt-3 flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-xs font-medium text-white hover:bg-brand disabled:opacity-60"
       >
         <Volume2 size={14} /> {playing ? "Speaking…" : "Hear it"}
       </button>

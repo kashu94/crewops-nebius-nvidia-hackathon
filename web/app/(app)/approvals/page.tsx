@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FourEyes } from "@/components/four-eyes";
 import { useLiveListener } from "@/components/live";
 import { useMe } from "@/components/me";
-import { Button, Empty, Mono, Notice, Panel, rupees, Spinner } from "@/components/ui";
+import { Button, Empty, Mono, Notice, Panel, rupees, Spinner, Status } from "@/components/ui";
 import { tool } from "@/lib/client";
 import type { QueueItem } from "@/lib/types";
 
@@ -38,9 +38,9 @@ function Decision({ item, onDone }: { item: QueueItem; onDone: (text: string, ok
   }
 
   return (
-    <li className="lift animate-rise rounded-2xl border border-amber-200 bg-surface p-4 shadow-sm">
+    <li className="lift rounded-lg border border-amber-200 bg-surface p-4">
       <div className="flex flex-wrap items-start gap-3">
-        <span className="animate-beacon grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-pending-soft text-pending">
+        <span className="animate-beacon grid h-10 w-10 shrink-0 place-items-center rounded-md bg-pending-soft text-pending">
           <Fingerprint size={20} />
         </span>
         <div className="min-w-0 flex-1">
@@ -67,6 +67,13 @@ function Decision({ item, onDone }: { item: QueueItem; onDone: (text: string, ok
         </div>
       </div>
 
+      {item.note && (
+        <p className="mt-3 rounded-md bg-sunken px-3 py-2 text-sm">
+          <span className="text-muted">Note from {item.submitted_by}: </span>
+          {item.note}
+        </p>
+      )}
+
       <FourEyes
         className="mt-3"
         fingerprint={item.fingerprint}
@@ -76,7 +83,7 @@ function Decision({ item, onDone }: { item: QueueItem; onDone: (text: string, ok
 
       <ul className="mt-3 flex flex-col gap-1.5">
         {item.assignments?.map((a) => (
-          <li key={a} className="rounded-lg bg-sunken px-3 py-2 font-mono text-xs text-slate-700">
+          <li key={a} className="rounded-lg bg-sunken px-3 py-2 font-mono text-xs text-foreground">
             {a}
           </li>
         ))}
@@ -116,7 +123,7 @@ function Decision({ item, onDone }: { item: QueueItem; onDone: (text: string, ok
             </div>
           ) : confirming ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                 <ShieldCheck size={14} className="text-accent" /> Legality and the fingerprint are re-checked; the
                 roster changes and your approval is sealed to this plan in one step.
               </span>
@@ -143,13 +150,101 @@ function Decision({ item, onDone }: { item: QueueItem; onDone: (text: string, ok
   );
 }
 
+/** A disruption a controller resolved with a remark: the approver signs it off or sends it
+ * back. No roster change rides on it, so there is no plan to commit. */
+function SignOff({ item, onDone }: { item: QueueItem; onDone: (text: string, ok: boolean) => void }) {
+  const [returning, setReturning] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function act(name: "confirm_resolution" | "return_resolution") {
+    setBusy(true);
+    try {
+      await tool(name, {
+        disruption_id: item.disruption_id,
+        ...(name === "return_resolution" ? { reason } : {}),
+      });
+      onDone(
+        name === "confirm_resolution"
+          ? `${item.disruption_id} marked resolved.`
+          : `${item.disruption_id} sent back to the desk.`,
+        true,
+      );
+    } catch (err) {
+      onDone(err instanceof Error ? err.message : "Failed.", false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="rounded-lg border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={`/console/${encodeURIComponent(item.disruption_id)}`}
+          className="flex items-center gap-0.5 text-sm font-semibold text-accent hover:underline"
+        >
+          <Mono>{item.disruption_id}</Mono> <ArrowUpRight size={12} />
+        </Link>
+        <Status value="RESOLVING" />
+        <span className="ml-auto flex items-center gap-1 text-xs text-muted">
+          <UserRound size={12} /> resolved by {item.submitted_by}
+        </span>
+      </div>
+      {item.summary && <p className="mt-1 text-sm text-muted">{item.summary}</p>}
+      <p className="mt-2 rounded-md bg-sunken px-3 py-2 text-sm">
+        <span className="text-muted">What was done: </span>
+        {item.remark}
+      </p>
+      <div className="mt-3 flex flex-col gap-2 border-t border-rule pt-3">
+        {returning ? (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              autoFocus
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={300}
+              placeholder="Why it goes back to the desk"
+              className="min-w-0 flex-1 rounded-md border border-control px-3 py-1.5 text-sm outline-none focus:border-accent"
+            />
+            <Button
+              type="button"
+              tone="danger"
+              disabled={busy || !reason.trim()}
+              onClick={() => act("return_resolution")}
+            >
+              Send back
+            </Button>
+            <Button type="button" tone="ghost" onClick={() => setReturning(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" tone="primary" disabled={busy} onClick={() => act("confirm_resolution")}>
+              {busy ? <Spinner /> : <CheckCheck size={14} />} Mark resolved
+            </Button>
+            <Button type="button" tone="secondary" onClick={() => setReturning(true)}>
+              <X size={14} /> Send back…
+            </Button>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export default function Approvals() {
   const [items, setItems] = useState<QueueItem[] | null>(null);
+  const [signOffs, setSignOffs] = useState<QueueItem[]>([]);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const load = useCallback(() => {
     tool<QueueItem[]>("my_queue").then(
-      (q) => setItems(q.filter((i) => i.kind === "to_decide")),
+      (q) => {
+        setItems(q.filter((i) => i.kind === "to_decide"));
+        setSignOffs(q.filter((i) => i.kind === "to_confirm"));
+      },
       (err: Error) => setMessage({ tone: "error", text: err.message }),
     );
   }, []);
@@ -186,6 +281,24 @@ export default function Approvals() {
             {items.map((item) => (
               <Decision
                 key={item.plan_id}
+                item={item}
+                onDone={(text, ok) => {
+                  setMessage({ tone: ok ? "ok" : "error", text });
+                  load();
+                }}
+              />
+            ))}
+          </ol>
+        )}
+      </Panel>
+      <Panel title="Resolved by controllers, waiting for your sign-off" bodyClassName="p-3">
+        {signOffs.length === 0 ? (
+          <Empty>Nothing waits for sign-off.</Empty>
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {signOffs.map((item) => (
+              <SignOff
+                key={item.disruption_id}
                 item={item}
                 onDone={(text, ok) => {
                   setMessage({ tone: ok ? "ok" : "error", text });

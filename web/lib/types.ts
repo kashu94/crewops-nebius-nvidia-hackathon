@@ -240,6 +240,8 @@ export type Detail = {
   disruption_id: string;
   status: string;
   summary: string;
+  /** What the reporter (or crew member) added for crew control. */
+  narrative?: string;
   severity?: Severity | null;
   report_type: string | null;
   reported_utc: string | null;
@@ -294,12 +296,18 @@ export type QueueItem = {
   uncovered?: string[];
   warnings?: string[];
   reason?: string | null;
+  /** to_confirm: what the controller did, for the approver to sign off */
+  remark?: string | null;
+  /** to_decide: the controller's note to the approver */
+  note?: string | null;
   submitted_utc?: string | null;
   /** SHA-256 of exactly what was submitted (crewops.plans.fingerprint). */
   fingerprint?: string | null;
 };
 
 const s = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
+// " (sick)", or nothing when the reason was withheld (a reporter never sees why crew are out)
+const why = (v: unknown) => (s(v) ? ` (${s(v).replace(/_/g, " ")})` : "");
 
 /** One line a controller reads at a glance, built from the report itself. */
 export function describe(item: Pick<FeedItem, "report_type" | "details">): string {
@@ -307,15 +315,15 @@ export function describe(item: Pick<FeedItem, "report_type" | "details">): strin
   switch (item.report_type) {
     case "crew_unavailable": {
       const to = s(d.to_date) && s(d.to_date) !== s(d.from_date) ? ` to ${s(d.to_date)}` : "";
-      return `${s(d.crew_id)} unavailable ${s(d.from_date)}${to} (${s(d.reason)})`;
+      return `${s(d.crew_id)} unavailable ${s(d.from_date)}${to}${why(d.reason)}`;
     }
     case "multiple_crew_unavailable": {
       const ids = Array.isArray(d.crew_ids) ? (d.crew_ids as unknown[]).map(s) : [];
       const to = s(d.to_date) && s(d.to_date) !== s(d.from_date) ? ` to ${s(d.to_date)}` : "";
-      return `${ids.length} crew unavailable ${s(d.from_date)}${to} (${s(d.reason)}): ${ids.join(", ")}`;
+      return `${ids.length} crew unavailable ${s(d.from_date)}${to}${why(d.reason)}: ${ids.join(", ")}`;
     }
     case "planned_leave":
-      return `${s(d.crew_id)} on planned leave ${s(d.from_date)} to ${s(d.to_date)} (${s(d.reason).replace(/_/g, " ")})`;
+      return `${s(d.crew_id)} on planned leave ${s(d.from_date)} to ${s(d.to_date)}${why(d.reason)}`;
     case "gate_closure":
       return `${s(d.gate)} closed ${s(d.from_utc).slice(11, 16)}–${s(d.to_utc).slice(11, 16)}Z (${s(d.reason)})`;
     case "certification_lapse":

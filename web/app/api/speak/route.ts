@@ -1,4 +1,4 @@
-import { declaredTooLarge, RateLimit } from "@/lib/limits";
+import { declaredTooLarge, parseJson, RateLimit, readCapped } from "@/lib/limits";
 import { currentTokens } from "@/lib/session";
 import { synthesize } from "@/lib/polly";
 import { claimsOf } from "@/lib/tokens";
@@ -22,7 +22,9 @@ export async function POST(request: Request) {
   if (!perUser.allow(user)) {
     return Response.json({ error: "Speech is paused for a few minutes; the answers stay on screen." }, { status: 429 });
   }
-  const body = (await request.json().catch(() => null)) as { text?: unknown } | null;
+  const raw = await readCapped(request, 8_000);
+  if (raw === null) return Response.json({ error: "Request too large." }, { status: 413 });
+  const body = parseJson(raw) as { text?: unknown } | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   if (!text) {
     return Response.json({ error: "Nothing to say." }, { status: 400 });

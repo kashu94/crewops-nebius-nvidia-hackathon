@@ -14,14 +14,15 @@ const ALL: Record<string, View> = {
   report: { href: "/report", label: "Report", hint: "Record a disruption" },
   approvals: { href: "/approvals", label: "Approver", hint: "Plans waiting for your approval" },
   crew: { href: "/crew", label: "Crew", hint: "My duty, my flights, report unavailable" },
-  admin: { href: "/admin", label: "Admin", hint: "Rule thresholds, activity, alerts" },
+  admin: { href: "/admin", label: "Admin", hint: "Revoke reports, passwords, thresholds, alerts" },
   assistant: { href: "/assistant", label: "Assistant", hint: "Talk to CrewOps" },
 };
 
 export function viewsFor(roles: Role[]): View[] {
   const has = (...r: Role[]) => roles.some((role) => r.includes(role));
   const views: View[] = [];
-  if (has("controller", "auditor", "admin", "super_admin")) views.push(ALL.console);
+  // Admins look after the system and the team, not the cover: no controller console for them.
+  if (has("controller", "auditor")) views.push(ALL.console);
   if (has("controller", "approver", "auditor", "admin", "super_admin")) views.push(ALL.disruptions);
   if (has("approver", "auditor")) views.push(ALL.approvals);
   if (has("reporter")) views.push(ALL.operations, ALL.report);

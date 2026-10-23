@@ -205,6 +205,8 @@ export default function Speaker() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  const [question, setQuestion] = useState("");
+  const [reply, setReply] = useState<{ question: string; text: string; inScope: boolean } | null>(null);
   const audio = useRef<AudioContext | null>(null);
   const announced = useRef<Set<string>>(new Set());
   // per unheard alert: times announced, and when the next one is due
@@ -373,23 +375,63 @@ export default function Speaker() {
     setOn(true);
   }
 
+  // Room questions (desks, controllers, open disruptions) are answered by rules on the server;
+  // anything else gets a polite "outside what this speaker covers".
+  async function ask(text: string) {
+    const q = text.trim();
+    if (!q) return;
+    // One voice at a time: wait for an announcement already playing, then hold the speaker
+    // so a reminder that falls due meanwhile doesn't talk over the answer.
+    while (busy.current) await new Promise((r) => setTimeout(r, 250));
+    busy.current = true;
+    setSpeaking(true);
+    try {
+      const r = await fetch("/api/speaker/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q, scope }),
+        signal: AbortSignal.timeout(20_000),
+      }).catch(() => null);
+      const d = (await r?.json().catch(() => null)) as {
+        result?: { text: string; inScope: boolean };
+        error?: string;
+      } | null;
+      const answer = d?.result ?? { text: d?.error ?? "CrewOps is unreachable right now.", inScope: false };
+      setReply({ question: q, ...answer });
+      await say(answer.text);
+    } finally {
+      busy.current = false;
+      setSpeaking(false);
+    }
+  }
+
   function listen() {
     const r = makeRecognition();
     if (!r) {
-      void read();
+      setError("This browser can't listen. Type the question instead.");
       return;
     }
     recognition.current = r;
+    setError(null);
     setListening(true);
     r.onresult = (e) => {
       const last = e.results[e.results.length - 1];
       if (!last?.isFinal) return;
       const said = last[0].transcript.toLowerCase();
-      if (/notification|what('s| is) new|anything|messages?/.test(said)) void read();
-      else if (/clear|dismiss/.test(said)) markHeard(unheard.map((a) => a.id));
-      else void say("Ask: what are my notifications?");
+      if (/notification|what('s| is) new|messages?/.test(said)) void read();
+      else if (/^\s*(clear|dismiss)/.test(said)) markHeard(unheard.map((a) => a.id));
+      else void ask(said);
     };
-    r.onerror = () => setListening(false);
+    r.onerror = (e) => {
+      setListening(false);
+      setError(
+        e.error === "not-allowed" || e.error === "service-not-allowed"
+          ? "Microphone blocked: allow it from the icon in the address bar, or type the question."
+          : e.error === "no-speech"
+            ? "Didn't hear anything. Try again, or type the question."
+            : "Couldn't listen just now. Type the question instead.",
+      );
+    };
     r.onend = () => setListening(false);
     r.start();
   }
@@ -583,7 +625,7 @@ export default function Speaker() {
                   onClick={listen}
                   disabled={speaking || listening}
                   className="flex items-center gap-2 rounded-full bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 ring-1 ring-white/15 hover:bg-white/10 disabled:opacity-60"
-                  title="Say: what are my notifications?"
+                  title="Ask about desks, controllers or open disruptions"
                 >
                   <Mic size={16} className={listening ? "text-sky-300" : ""} /> {listening ? "Listening…" : "Ask"}
                 </button>
@@ -597,6 +639,41 @@ export default function Speaker() {
                     <Check size={16} /> Got it
                   </button>
                 )}
+              </div>
+            )}
+            {on && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void ask(question);
+                  setQuestion("");
+                }}
+                className="flex w-full max-w-sm items-center gap-2"
+              >
+                <input
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  maxLength={300}
+                  placeholder="Ask: how many disruptions on Rohit's desk?"
+                  aria-label="Type a question"
+                  className="min-w-0 flex-1 rounded-full border border-white/10 bg-slate-950/60 px-4 py-2 text-sm outline-none placeholder:text-slate-500 focus:border-sky-400"
+                />
+                <button
+                  type="submit"
+                  disabled={speaking || !question.trim()}
+                  className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/15 disabled:opacity-50"
+                >
+                  Ask
+                </button>
+              </form>
+            )}
+            {on && reply && (
+              <div
+                className={`w-full max-w-sm rounded-2xl px-4 py-3 text-sm ring-1 ${reply.inScope ? "bg-sky-500/10 ring-sky-400/20" : "bg-white/5 ring-white/10"}`}
+                aria-live="polite"
+              >
+                <p className="text-xs text-slate-400">&ldquo;{reply.question}&rdquo;</p>
+                <p className="mt-1 text-slate-100">{reply.text}</p>
               </div>
             )}
             {on && (

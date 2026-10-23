@@ -1,0 +1,24 @@
+# Amplify Hosting build for the web app (web/). The CREWOPS_* variables set in the Amplify
+# console are only visible at build time, so they are written to .env.production for the
+# Next.js server to read at runtime.
+version: 1
+applications:
+  - appRoot: web
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm use 20
+            - npm ci
+        build:
+          commands:
+            - env | grep -E '^CREWOPS_' > .env.production
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*

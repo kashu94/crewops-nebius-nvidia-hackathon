@@ -52,25 +52,20 @@ function Kpi({
   icon: typeof Radio;
 }) {
   const tones = {
-    critical: "from-red-50 text-critical border-red-100",
-    pending: "from-amber-50 text-pending border-amber-100",
-    accent: "from-sky-50 text-accent border-sky-100",
-    ok: "from-emerald-50 text-ok border-emerald-100",
+    critical: "text-critical border-red-100",
+    pending: "text-pending border-amber-100",
+    accent: "text-accent border-[#cfe0ef]",
+    ok: "text-ok border-emerald-100",
   };
   // border rather than ring: rings draw outside the box and the workspace clips them at the
   // edges
   return (
-    <div
-      className={cx(
-        "animate-rise flex items-center gap-3 rounded-2xl border bg-gradient-to-br to-white p-4",
-        tones[tone],
-      )}
-    >
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm">
+    <div className={cx("flex items-center gap-3 rounded-lg border bg-surface p-4", tones[tone])}>
+      <span className="grid h-10 w-10 place-items-center rounded-md bg-white">
         <Icon size={18} />
       </span>
       <span>
-        <span className="block font-mono text-2xl font-semibold tabular-nums text-slate-900">{value}</span>
+        <span className="block font-mono text-2xl font-semibold tabular-nums text-foreground">{value}</span>
         <span className="block text-xs font-medium text-muted">{label}</span>
       </span>
     </div>
@@ -102,12 +97,12 @@ function Feed({
         const Icon = TYPE_ICON[d.report_type ?? ""] ?? Radio;
         const critical = d.status === "REPORTED" || d.status === "OPTIONS_READY";
         return (
-          <li key={d.disruption_id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
+          <li key={d.disruption_id} className="" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
             <button
               onClick={() => onSelect(d.disruption_id)}
               className={cx(
-                "relative flex w-full gap-3 rounded-xl px-2 py-2.5 text-left transition",
-                selected === d.disruption_id ? "bg-accent-soft ring-1 ring-sky-200" : "hover:bg-sunken",
+                "relative flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition",
+                selected === d.disruption_id ? "bg-accent-soft ring-1 ring-[#cfe0ef]" : "hover:bg-sunken",
               )}
             >
               <span
@@ -132,7 +127,7 @@ function Feed({
                     <Status value={shownStatus(d.status, d.handling)} />
                   </span>
                 </span>
-                <span className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                <span className="mt-1 flex items-center gap-1.5 text-sm font-medium text-foreground">
                   {(d.airlines ?? []).map((a) => (
                     <AirlineBadge key={a} code={a} compact />
                   ))}
@@ -195,7 +190,7 @@ function Solutions({ id, onChanged }: { id: string; onChanged: () => void }) {
       <HandlingBanner handling={detail.handling} />
       <CommittedPlan detail={detail} />
       {detail.seats.length === 0 ? (
-        <p className="text-sm leading-relaxed text-slate-700">
+        <p className="text-sm leading-relaxed text-foreground">
           {detail.summary || "No seats to cover for this disruption."}
         </p>
       ) : (
@@ -211,7 +206,7 @@ function Solutions({ id, onChanged }: { id: string; onChanged: () => void }) {
           </div>
         ))
       )}
-      <div className="rounded-xl border border-line bg-sunken/60 p-3">
+      <div className="rounded-md border border-line bg-sunken/60 p-3">
         <Actions
           detail={detail}
           onChanged={() => {

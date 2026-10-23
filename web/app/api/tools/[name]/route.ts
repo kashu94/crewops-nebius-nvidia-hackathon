@@ -1,4 +1,4 @@
-import { declaredTooLarge } from "@/lib/limits";
+import { declaredTooLarge, readCapped } from "@/lib/limits";
 import { callTool } from "@/lib/mcp";
 import { ToolCallError } from "@/lib/mcp-result";
 import { currentTokens } from "@/lib/session";
@@ -23,8 +23,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/tools/[name
   if (!tokens) {
     return Response.json({ error: "Sign in first." }, { status: 401 });
   }
-  const text = await request.text();
-  if (text.length > MAX_BODY) {
+  const text = await readCapped(request, MAX_BODY);
+  if (text === null) {
     return Response.json({ error: "Request too large." }, { status: 413 });
   }
   let args: Record<string, unknown> = {};

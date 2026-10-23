@@ -40,7 +40,7 @@ function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-line bg-sunken p-1">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-line bg-sunken p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -50,7 +50,7 @@ function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={cx(
             "rounded-lg px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-40",
-            value === o.value ? "bg-surface font-semibold shadow-sm" : "text-muted hover:text-foreground",
+            value === o.value ? "bg-surface font-semibold" : "text-muted hover:text-foreground",
           )}
         >
           {o.label}
@@ -125,7 +125,7 @@ export default function Disruptions() {
           />
         ) : (
           <span
-            className="rounded-xl border border-line bg-sunken px-3 py-2 text-sm text-muted"
+            className="rounded-md border border-line bg-sunken px-3 py-2 text-sm text-muted"
             title="Only controllers hold a desk"
           >
             Whole network <span className="font-mono text-xs">{count("network")}</span>
@@ -179,7 +179,7 @@ export default function Disruptions() {
                       {day(d.reported_utc)} <Mono>{clock(d.reported_utc)}</Mono>
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                         {(d.airlines ?? []).map((a) => (
                           <AirlineBadge key={a} code={a} compact />
                         ))}
@@ -193,7 +193,7 @@ export default function Disruptions() {
                             key={k}
                             className={cx(
                               "rounded px-1.5 font-semibold",
-                              k === me.desk ? "bg-pending-soft text-amber-800" : "bg-slate-100 text-slate-600",
+                              k === me.desk ? "bg-pending-soft text-amber-800" : "bg-sunken text-muted",
                             )}
                           >
                             {k}

@@ -18,7 +18,7 @@ function marked(text: string): ReactNode[] {
         key={i}
         className={cx(
           "rounded px-1 font-mono text-[0.92em]",
-          money ? "bg-emerald-50 font-semibold text-emerald-800" : "bg-sky-50 text-sky-800",
+          money ? "bg-emerald-50 font-semibold text-emerald-800" : "bg-accent-soft text-[#173f63]",
         )}
       >
         {part}

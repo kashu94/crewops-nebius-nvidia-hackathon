@@ -65,6 +65,7 @@ export async function forgetDesktopAlerts(): Promise<void> {
 export function DesktopAlerts() {
   const [state, setState] = useState<State>("loading");
   const [key, setKey] = useState("");
+  const [problem, setProblem] = useState("");
 
   useEffect(() => {
     let live = true;
@@ -95,16 +96,31 @@ export function DesktopAlerts() {
 
   async function turnOn() {
     setState("busy");
+    setProblem("");
     try {
-      if ((await Notification.requestPermission()) !== "granted") return setState("blocked");
+      const permission = await Notification.requestPermission();
+      // "default" means the prompt was dismissed, not refused: the bell stays usable.
+      if (permission === "denied") return setState("blocked");
+      if (permission !== "granted") return setState("off");
       const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       await navigator.serviceWorker.ready;
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
+      const subscribe = () => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+      let sub = await reg.pushManager.getSubscription();
+      if (sub && !sameKey(sub, key)) {
+        await sub.unsubscribe().catch(() => undefined);
+        sub = null;
+      }
+      try {
+        sub = sub ?? (await subscribe());
+      } catch {
+        // a subscription left half-removed by an earlier turn-off: clear it and try once more
+        await (await reg.pushManager.getSubscription())?.unsubscribe().catch(() => undefined);
+        sub = await subscribe();
+      }
       await register(sub);
       setState("on");
-    } catch {
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "the browser refused");
       setState("off");
     }
   }
@@ -125,12 +141,14 @@ export function DesktopAlerts() {
       ? "Desktop alerts are blocked for this site in the browser's settings"
       : on
         ? "Desktop alerts are on in this browser (click to turn off)"
-        : "Turn on desktop alerts: a notification when something needs you, even with CrewOps closed";
+        : problem
+          ? `Desktop alerts could not be turned on (${problem}). Click to try again`
+          : "Turn on desktop alerts: a notification when something needs you, even with CrewOps closed";
   return (
     <button
       className={cx(
-        "rounded-lg p-2 transition hover:bg-sunken",
-        on ? "text-accent" : "text-muted hover:text-foreground",
+        "rounded-md p-1.5 transition-colors hover:bg-active",
+        on ? "text-accent" : problem ? "text-critical" : "text-muted hover:text-foreground",
         state === "busy" && "animate-pulse",
       )}
       title={title}

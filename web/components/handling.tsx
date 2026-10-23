@@ -38,9 +38,9 @@ const KIND: Record<Handling["kind"], { label: string; tone: string; icon: typeof
     tone: "border-emerald-200 bg-emerald-50/70 text-emerald-900",
     icon: CheckCircle2,
   },
-  recrew: { label: "Re-crew needed", tone: "border-sky-200 bg-sky-50/70 text-sky-900", icon: Users },
+  recrew: { label: "Re-crew needed", tone: "border-[#cfe0ef] bg-accent-soft/70 text-[#173f63]", icon: Users },
   decision: { label: "Decision needed", tone: "border-amber-200 bg-amber-50/70 text-amber-900", icon: ShieldAlert },
-  recorded: { label: "Recorded", tone: "border-violet-200 bg-violet-50/70 text-violet-900", icon: CheckCircle2 },
+  recorded: { label: "Recorded", tone: "border-line bg-sunken text-[#353736]", icon: CheckCircle2 },
 };
 
 /** How this disruption gets resolved, in one sentence, at the top of the record. */
@@ -49,10 +49,10 @@ export function HandlingBanner({ handling }: { handling?: Handling | null }) {
   const k = KIND[handling.kind] ?? KIND.internal;
   const Icon = k.icon;
   return (
-    <div className={cx("animate-rise flex items-start gap-3 rounded-2xl border px-4 py-3", k.tone)}>
+    <div className={cx("flex items-start gap-3 rounded-lg border px-4 py-3", k.tone)}>
       <Icon size={18} className="mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.1em]">
+        <p className="flex items-center gap-1 text-xs font-semibold">
           {k.label} <Info term="handling" />
         </p>
         <p className="mt-0.5 text-sm leading-relaxed">{handling.text}</p>
@@ -82,7 +82,7 @@ function StandTable({ stands }: { stands: StandMove[] }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wide text-muted">
+            <tr className="text-left text-[11px] text-muted">
               <th className="pb-2 font-medium">Flight</th>
               <th className="pb-2 font-medium">Gate</th>
               <th className="pb-2 font-medium">Boards from</th>
@@ -113,7 +113,7 @@ function StandTable({ stands }: { stands: StandMove[] }) {
                         </Mono>
                       )}
                       {m.emergency && (
-                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-[#173f63]">
                           emergency gate
                         </span>
                       )}
@@ -175,7 +175,7 @@ function FlightTable({ flights, next }: { flights: FlightRow[]; next: NextAtGate
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-muted">
+              <tr className="text-left text-[11px] text-muted">
                 <th className="pb-2 font-medium">Flight</th>
                 <th className="pb-2 font-medium">Route</th>
                 <th className="pb-2 font-medium">Departs</th>
@@ -221,7 +221,7 @@ function FlightTable({ flights, next }: { flights: FlightRow[]; next: NextAtGate
       )}
       {next.length > 0 && (
         <div className="mt-4 border-t border-line pt-3">
-          <h3 className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+          <h3 className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted">
             Next at the same gate <Info term="next_at_gate" />
           </h3>
           <ul className="flex flex-col gap-1.5 text-sm">
@@ -266,9 +266,9 @@ export function NoticeList({ notices }: { notices: TeamNotice[] }) {
         {notices.map((n, i) => {
           const Icon = TEAM_ICON[n.team] ?? Mail;
           return (
-            <li key={`${n.team}-${n.scope}-${i}`} className="rounded-xl border border-line bg-surface px-3 py-2.5">
+            <li key={`${n.team}-${n.scope}-${i}`} className="rounded-md border border-line bg-surface px-3 py-2.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-sky-700">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent-soft text-[#173f63]">
                   <Icon size={14} />
                 </span>
                 <span className="text-sm font-semibold">{n.team_title}</span>
@@ -284,7 +284,7 @@ export function NoticeList({ notices }: { notices: TeamNotice[] }) {
                 <span
                   className={cx(
                     "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                    n.channel === "in_app" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600",
+                    n.channel === "in_app" ? "bg-accent-soft text-[#173f63]" : "bg-sunken text-muted",
                   )}
                   title={
                     n.channel === "in_app" ? "Shown on their CrewOps page" : "Emailed to the team's alert addresses"
@@ -294,7 +294,7 @@ export function NoticeList({ notices }: { notices: TeamNotice[] }) {
                   {n.channel === "in_app" ? "in CrewOps" : "email"}
                 </span>
               </div>
-              <p className="mt-1.5 text-xs font-medium text-slate-700">To {n.why}.</p>
+              <p className="mt-1.5 text-xs font-medium text-foreground">To {n.why}.</p>
               <p className="mt-0.5 text-xs leading-relaxed text-muted">{n.message}</p>
             </li>
           );

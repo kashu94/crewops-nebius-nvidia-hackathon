@@ -57,7 +57,7 @@ function Waveform({ active, tone }: { active: boolean; tone: "listen" | "think" 
           className={cx(
             "h-full w-[4px] rounded-full transition-colors",
             active ? "wave-bar" : "scale-y-[0.18]",
-            tone === "listen" ? "bg-sky-400" : tone === "speak" ? "bg-emerald-400" : "bg-indigo-400",
+            tone === "listen" ? "bg-accent" : tone === "speak" ? "bg-ok" : "bg-[#8a8d90]",
           )}
           style={{
             animationDelay: `${(i % 7) * 90}ms`,
@@ -104,10 +104,16 @@ export function AlexaModule({
     conversationRef.current = conversation;
   }, [conversation]);
 
+  // False once the assistant is left: an answer still on its way must not start speaking
+  // on another page, where nothing could stop it.
+  const mounted = useRef(true);
+
   useEffect(() => {
+    mounted.current = true;
     recognition.current = makeRecognition();
     setCanListen(recognition.current !== null);
     return () => {
+      mounted.current = false;
       audio.current?.pause();
       if (clipUrl.current) URL.revokeObjectURL(clipUrl.current);
     };
@@ -125,10 +131,11 @@ export function AlexaModule({
         question: text,
         conversation_id: conversationRef.current,
       });
+      if (!mounted.current) return;
       setTurns((t) => t.map((x) => (x.id === id ? { ...x, answer } : x)));
       if (voice) {
-        const clip = await speak(answer.answer);
-        if (clip) {
+        const clip = mounted.current ? await speak(answer.answer) : null;
+        if (clip && mounted.current) {
           audio.current?.pause();
           if (clipUrl.current) URL.revokeObjectURL(clipUrl.current);
           clipUrl.current = URL.createObjectURL(clip);
@@ -221,7 +228,7 @@ export function AlexaModule({
     >
       <div className="flex min-w-0 flex-col gap-4">
         {/* The speaker */}
-        <div className="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-b from-white via-sky-50/60 to-white p-5">
+        <div className="relative overflow-hidden rounded-lg border border-[#cfe0ef] bg-surface p-5">
           <div className="flex items-start gap-4">
             <button
               onClick={listen}
@@ -231,18 +238,18 @@ export function AlexaModule({
             >
               {busy && (
                 <>
-                  <span className="animate-ring absolute inset-0 rounded-full border-2 border-sky-300" />
-                  <span className="animate-ring absolute inset-0 rounded-full border-2 border-sky-300 [animation-delay:800ms]" />
+                  <span className="animate-ring absolute inset-0 rounded-full border-2 border-[#cfe0ef]" />
+                  <span className="animate-ring absolute inset-0 rounded-full border-2 border-[#cfe0ef] [animation-delay:800ms]" />
                 </>
               )}
               <span
                 className={cx(
-                  "relative grid h-20 w-20 place-items-center rounded-full border-4 shadow-lg transition",
+                  "relative grid h-20 w-20 place-items-center rounded-full border-4 transition",
                   listening
-                    ? "border-sky-400 bg-sky-500 text-white"
+                    ? "border-accent bg-accent text-white"
                     : thinking
-                      ? "border-indigo-300 bg-indigo-500 text-white"
-                      : "border-sky-200 bg-white text-sky-600 group-hover:border-sky-400 group-hover:shadow-sky-200",
+                      ? "border-[#cfe0ef] bg-accent text-white"
+                      : "border-[#cfe0ef] bg-white text-accent group-hover:border-accent",
                   !canListen && "opacity-60",
                 )}
               >
@@ -251,7 +258,7 @@ export function AlexaModule({
             </button>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">
+                <span className="text-xs font-semibold text-[#173f63]">
                   {listening
                     ? "Listening"
                     : thinking
@@ -266,7 +273,7 @@ export function AlexaModule({
                   {playback !== "idle" && (
                     <>
                       <button
-                        className="flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-line transition hover:text-foreground"
+                        className="flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-medium text-foreground ring-1 ring-line transition hover:text-foreground"
                         title={playback === "playing" ? "Pause the answer" : "Resume the answer"}
                         onClick={() => {
                           const a = audio.current;
@@ -318,15 +325,15 @@ export function AlexaModule({
                 </div>
               </div>
               <Waveform active={busy} tone={listening ? "listen" : playback === "playing" ? "speak" : "think"} />
-              <div key={last?.id ?? "idle"} className="animate-rise min-h-[3.5rem]">
+              <div key={last?.id ?? "idle"} className="min-h-[3.5rem]">
                 {listening ? (
-                  <p className="text-lg text-sky-700">{heard || "Go ahead… (tap the microphone again to stop)"}</p>
+                  <p className="text-lg text-[#173f63]">{heard || "Go ahead… (tap the microphone again to stop)"}</p>
                 ) : voiceError ? (
                   <p className="text-sm text-amber-800">{voiceError}</p>
                 ) : last?.answer ? (
                   <AnswerText
                     text={last.answer.answer}
-                    className="max-h-40 overflow-y-auto pr-2 text-[15px] leading-relaxed text-slate-800 [scrollbar-width:thin]"
+                    className="max-h-40 overflow-y-auto pr-2 text-[15px] leading-relaxed text-foreground [scrollbar-width:thin]"
                   />
                 ) : last?.error ? (
                   <p className="text-sm text-critical">{last.error}</p>
@@ -334,7 +341,7 @@ export function AlexaModule({
                   <p className="text-sm text-muted">Tap the microphone and ask, or pick a question below.</p>
                 )}
                 {last?.answer?.awaiting && !listening && (
-                  <p className="mt-2 text-xs font-medium text-sky-700">Just answer — I remember what you asked.</p>
+                  <p className="mt-2 text-xs font-medium text-[#173f63]">Just answer — I remember what you asked.</p>
                 )}
               </div>
             </div>
@@ -348,7 +355,7 @@ export function AlexaModule({
               key={s}
               onClick={() => ask(s)}
               disabled={thinking}
-              className="lift rounded-full border border-line bg-surface px-3 py-1.5 text-left text-xs text-slate-700 disabled:opacity-50"
+              className="lift rounded-full border border-line bg-surface px-3 py-1.5 text-left text-xs text-foreground disabled:opacity-50"
             >
               “{s}”
             </button>
@@ -361,11 +368,11 @@ export function AlexaModule({
             onChange={(e) => setTyped(e.target.value)}
             placeholder="Ask CrewOps anything about the roster…"
             maxLength={1000}
-            className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-4 focus:ring-sky-100"
+            className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-4 focus:ring-[#cfe0ef]"
           />
           <button
             disabled={thinking || !typed.trim()}
-            className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white shadow-sm transition hover:bg-sky-700 disabled:opacity-40"
+            className="grid h-10 w-10 place-items-center rounded-md bg-accent text-white transition hover:bg-[#173f63] disabled:opacity-40"
             title="Ask"
           >
             <Send size={16} />
@@ -376,12 +383,12 @@ export function AlexaModule({
       {/* The conversation, newest first; the latest exchange stands out */}
       <section className={cx("flex min-h-0 min-w-0 flex-col gap-2", wide && "lg:h-full")}>
         {wide && (
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+          <h2 className="text-[13px] font-semibold text-muted">
             Conversation {turns.length > 0 && <span className="font-mono text-muted">{turns.length}</span>}
           </h2>
         )}
         {wide && turns.length === 0 && (
-          <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">
+          <p className="rounded-md border border-dashed border-line p-6 text-center text-sm text-muted">
             Your questions and CrewOps&apos; answers appear here.
           </p>
         )}
@@ -390,14 +397,14 @@ export function AlexaModule({
             <li
               key={t.id}
               className={cx(
-                "animate-rise rounded-xl border p-3 text-sm transition",
+                "rounded-md border p-3 text-sm transition",
                 t.id === latestId
-                  ? "border-sky-300 bg-gradient-to-br from-sky-50 to-white shadow-sm ring-2 ring-sky-100"
+                  ? "border-[#cfe0ef] bg-surface ring-2 ring-[#cfe0ef]"
                   : "border-line bg-sunken/60 opacity-80",
               )}
             >
               {t.id === latestId && (
-                <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800">
+                <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-[#173f63]">
                   {t.id === spokenId && playback === "playing" ? (
                     <>
                       <Volume2 size={11} /> Speaking
@@ -407,25 +414,25 @@ export function AlexaModule({
                   )}
                 </span>
               )}
-              <p className="font-medium text-slate-800">{t.question}</p>
+              <p className="font-medium text-foreground">{t.question}</p>
               {t.answer && (
                 <>
-                  <AnswerText text={t.answer.answer} className="mt-1.5 text-slate-700" />
+                  <AnswerText text={t.answer.answer} className="mt-1.5 text-foreground" />
                   <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
                     <span
                       className={cx(
                         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium",
-                        t.answer.verified ? "bg-ok-soft text-emerald-700" : "bg-slate-100 text-slate-600",
+                        t.answer.verified ? "bg-ok-soft text-emerald-700" : "bg-sunken text-muted",
                       )}
                     >
                       {t.answer.verified && <BadgeCheck size={12} />}
                       {t.answer.verified ? "Verified" : "No facts stated"}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                    <span className="rounded-full bg-sunken px-2 py-0.5 text-muted">
                       {SOURCE[t.answer.source] ?? t.answer.source}
                     </span>
                     {t.answer.intent && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                      <span className="rounded-full bg-sunken px-2 py-0.5 text-muted">
                         {t.answer.intent.replace(/_/g, " ").toLowerCase()}
                       </span>
                     )}

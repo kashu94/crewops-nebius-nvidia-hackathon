@@ -1,9 +1,24 @@
 "use client";
 
-import { Activity, ChevronDown, LogOut, Mic, Plane, Radio } from "lucide-react";
+import {
+  Activity,
+  CalendarDays,
+  FilePlus2,
+  LayoutList,
+  ListChecks,
+  LogOut,
+  Menu,
+  Mic,
+  Plane,
+  Radio,
+  Settings,
+  Stamp,
+  UserRound,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { signOut } from "@/lib/client";
 import { homeFor, viewsFor } from "@/lib/roles";
@@ -19,12 +34,25 @@ const STAFF = ["controller", "approver", "auditor", "admin", "super_admin"];
 
 export function Shell({ children }: { children: ReactNode }) {
   const me = useMe();
+  const [menu, setMenu] = useState(false);
   return (
     <LiveProvider enabled={me.roles.some((r) => STAFF.includes(r))}>
-      <div className="flex min-h-screen flex-col">
-        <TopBar />
-        <Banner />
-        <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-5 sm:px-6">{children}</main>
+      {/* The frame: sidebar and top bar share one tint with no rule between them; the work
+          sits on a white sheet inset 8px from the window's right and bottom edges. */}
+      <div className="flex min-h-screen overflow-x-clip bg-background">
+        <aside className="sticky top-0 hidden h-screen w-[228px] shrink-0 flex-col px-3 pb-3 lg:flex">
+          <Brand />
+          <Nav />
+          <Account />
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar onMenu={() => setMenu(true)} />
+          <Banner />
+          <main className="mb-0 flex-1 border-line bg-surface px-4 py-6 sm:px-6 lg:mb-2 lg:mr-2 lg:rounded-2xl lg:border lg:px-8">
+            {children}
+          </main>
+        </div>
+        {menu && <MenuSheet onClose={() => setMenu(false)} />}
         <AlexaButton />
         <WelcomeBack />
       </div>
@@ -32,128 +60,154 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-function TopBar() {
+const ICONS: Record<string, typeof Plane> = {
+  "/console": LayoutList,
+  "/disruptions": ListChecks,
+  "/operations": CalendarDays,
+  "/report": FilePlus2,
+  "/approvals": Stamp,
+  "/crew": UserRound,
+  "/admin": Settings,
+  "/assistant": Mic,
+};
+
+function Brand() {
+  const me = useMe();
+  return (
+    <Link href={homeFor(me.roles)} className="flex h-12 items-center gap-2.5 px-2">
+      <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-white">
+        <Plane size={15} strokeWidth={2} />
+      </span>
+      <span className="text-[15px] font-semibold tracking-tight">CrewOps</span>
+      <span className="text-xs text-muted">with Alexa+</span>
+    </Link>
+  );
+}
+
+function Nav() {
+  const me = useMe();
+  const path = usePathname();
+  const views = viewsFor(me.roles);
+  return (
+    <nav aria-label="Views" className="mt-3 flex flex-col gap-0.5">
+      {views.map((v) => {
+        const Icon = ICONS[v.href] ?? LayoutList;
+        const active = path.startsWith(v.href);
+        return (
+          <Link
+            key={v.href}
+            href={v.href}
+            aria-current={active ? "page" : undefined}
+            title={v.hint}
+            className={cx(
+              "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors",
+              active ? "bg-active font-medium text-foreground" : "text-[#4b4d50] hover:bg-active/60",
+            )}
+          >
+            <Icon size={16} strokeWidth={1.6} className={active ? "text-foreground" : "text-muted"} />
+            {v.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Account() {
   const me = useMe();
   const router = useRouter();
+  return (
+    <div className="mt-auto flex items-center gap-2 rounded-md px-2 py-2">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-active text-xs font-semibold uppercase text-foreground">
+        {me.user_id.slice(0, 1)}
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-sm font-medium">{me.user_id}</span>
+        <span className="block truncate text-xs text-muted">
+          {me.roles.join(", ").replace(/_/g, " ")}
+          {me.desk && <> · {me.desk}</>}
+          {me.crew_id && <> · {me.crew_id}</>}
+        </span>
+      </span>
+      <button
+        className="rounded-md p-1.5 text-muted transition-colors hover:bg-active hover:text-foreground"
+        title="Sign out"
+        aria-label="Sign out"
+        onClick={async () => {
+          await forgetDesktopAlerts().catch(() => undefined);
+          await signOut().catch(() => undefined);
+          router.replace("/login");
+        }}
+      >
+        <LogOut size={16} />
+      </button>
+    </div>
+  );
+}
+
+function TopBar({ onMenu }: { onMenu: () => void }) {
+  const me = useMe();
   const path = usePathname();
   const views = viewsFor(me.roles);
   const current = views.find((v) => path.startsWith(v.href)) ?? views[0];
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
   const { state } = useLive();
 
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!menu.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const escape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", escape);
-    };
-  }, []);
-
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-white/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-4 py-2.5 sm:px-6">
-        <Link href={homeFor(me.roles)} className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white shadow-sm">
-            <Plane size={16} strokeWidth={2.2} />
-          </span>
-          <span className="leading-tight">
-            <span className="block text-sm font-semibold tracking-tight">CrewOps</span>
-            <span className="block text-[11px] text-muted">with Alexa+</span>
-          </span>
-        </Link>
-
-        <div ref={menu} className="relative">
-          <button
-            onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm shadow-sm transition hover:border-sky-300"
-            aria-expanded={open}
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 bg-background px-4 lg:static lg:pl-1 lg:pr-3">
+      <button
+        className="-ml-1 rounded-md p-1.5 text-muted hover:bg-active hover:text-foreground lg:hidden"
+        onClick={onMenu}
+        aria-label="Open the menu"
+      >
+        <Menu size={18} />
+      </button>
+      <span className="lg:hidden">
+        <Brand />
+      </span>
+      <p className="hidden min-w-0 truncate text-sm text-muted lg:block">
+        {current.label} <span className="text-[#9a9c9f]">·</span> {current.hint}
+      </p>
+      <div className="ml-auto flex items-center gap-2 text-sm">
+        {state !== "unavailable" && (
+          <span
+            className="hidden items-center gap-1.5 text-xs text-muted sm:flex"
+            title="Disruption status changes arrive here as they happen"
           >
-            <span className="text-muted">View</span>
-            <span className="font-semibold">{current.label}</span>
-            <ChevronDown size={14} className={cx("transition", open && "rotate-180")} />
-          </button>
-          {open && (
-            <ul className="animate-rise absolute left-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-              {views.map((v) => (
-                <li key={v.href}>
-                  <button
-                    aria-current={v.href === current.href ? "page" : undefined}
-                    onClick={() => {
-                      setOpen(false);
-                      router.push(v.href);
-                    }}
-                    className={cx(
-                      "flex w-full flex-col items-start rounded-lg px-3 py-2 text-left transition",
-                      v.href === current.href ? "bg-accent-soft" : "hover:bg-sunken",
-                    )}
-                  >
-                    <span className="text-sm font-medium">{v.label}</span>
-                    <span className="text-xs text-muted">{v.hint}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="ml-auto flex items-center gap-3 text-sm">
-          {state !== "unavailable" && (
-            <span
-              className={cx(
-                "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:flex",
-                state === "live" ? "bg-ok-soft text-emerald-700" : "bg-slate-100 text-slate-600",
-              )}
-              title="AppSync Events: disruption status changes arrive here as they happen"
-            >
-              <span className="relative flex h-2 w-2">
-                {state === "live" && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400" />}
-                <span
-                  className={cx("relative h-2 w-2 rounded-full", state === "live" ? "bg-emerald-500" : "bg-slate-400")}
-                />
-              </span>
-              {state === "live" ? "Live" : state === "connecting" ? "Connecting" : "Reconnecting"}
-            </span>
-          )}
-          <GuideButton />
-          {(me.roles.includes("controller") || me.roles.includes("approver")) && <DesktopAlerts />}
-          <span className="hidden flex-col items-end leading-tight md:flex">
-            <span className="font-medium">{me.user_id}</span>
-            <span className="text-[11px] text-muted">
-              {me.roles.join(", ").replace(/_/g, " ")}
-              {me.desk && (
-                <>
-                  {" "}
-                  · <Mono>{me.desk}</Mono>
-                </>
-              )}
-              {me.crew_id && (
-                <>
-                  {" "}
-                  · <Mono>{me.crew_id}</Mono>
-                </>
-              )}
-            </span>
+            <span className={cx("h-2 w-2 rounded-full", state === "live" ? "bg-ok" : "bg-[#9a9c9f]")} />
+            {state === "live" ? "Live" : state === "connecting" ? "Connecting" : "Reconnecting"}
           </span>
-          <button
-            className="rounded-lg p-2 text-muted transition hover:bg-sunken hover:text-foreground"
-            title="Sign out"
-            onClick={async () => {
-              await forgetDesktopAlerts().catch(() => undefined);
-              await signOut().catch(() => undefined);
-              router.replace("/login");
-            }}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
+        )}
+        <GuideButton />
+        {(me.roles.includes("controller") || me.roles.includes("approver")) && <DesktopAlerts />}
       </div>
     </header>
+  );
+}
+
+/** The phone's navigation: the sidebar's content in a sheet over the screen. */
+function MenuSheet({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", escape);
+    return () => document.removeEventListener("keydown", escape);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+      <button className="absolute inset-0 bg-black/30" aria-label="Close the menu" onClick={onClose} />
+      <div className="absolute inset-y-0 left-0 flex w-[280px] flex-col bg-background px-3 pb-3 shadow-xl">
+        <div className="flex items-center justify-between">
+          <Brand />
+          <button className="rounded-md p-1.5 text-muted hover:bg-active" onClick={onClose} aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+        {/* choosing a view closes the sheet */}
+        <div onClick={onClose}>
+          <Nav />
+        </div>
+        <Account />
+      </div>
+    </div>
   );
 }
 
@@ -166,13 +220,12 @@ function AlexaButton() {
       href="/assistant"
       aria-label="Ask Alexa+"
       title="Ask Alexa+"
-      className="group fixed bottom-6 right-6 z-40 grid h-16 w-16 place-items-center rounded-full"
+      className="group fixed bottom-5 right-5 z-40 grid h-12 w-12 place-items-center rounded-full"
     >
-      <span className="animate-ring absolute inset-0 rounded-full border-2 border-sky-300/70" />
-      <span className="relative grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-sky-400 via-sky-500 to-indigo-500 text-white shadow-lg shadow-sky-200 ring-4 ring-white transition group-hover:scale-105">
-        <Mic size={24} />
+      <span className="grid h-12 w-12 place-items-center rounded-full bg-brand text-white shadow-[0_4px_14px_rgb(0_0_0/0.18)] transition-colors group-hover:bg-accent">
+        <Mic size={20} />
       </span>
-      <span className="pointer-events-none absolute right-[4.6rem] whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow transition group-hover:opacity-100">
+      <span className="pointer-events-none absolute right-14 whitespace-nowrap rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
         Ask Alexa+
       </span>
     </Link>
@@ -199,15 +252,15 @@ function Banner() {
       aria-live="polite"
       className={cx(
         // Floats over the page, so it never pushes the workspace into scrolling.
-        "animate-drop fixed inset-x-0 top-[57px] z-20 border-b shadow-sm",
+        "animate-drop fixed right-4 top-14 z-40 w-[min(560px,calc(100vw-2rem))] rounded-lg border shadow-[0_8px_24px_rgb(0_0_0/0.12)]",
         critical
-          ? "border-red-200 bg-critical-soft"
+          ? "border-[#f5c2bd] bg-critical-soft"
           : waiting
-            ? "border-amber-200 bg-pending-soft"
-            : "border-sky-200 bg-accent-soft",
+            ? "border-[#fde68a] bg-pending-soft"
+            : "border-[#cfe0ef] bg-accent-soft",
       )}
     >
-      <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-4 py-2 text-sm sm:px-6">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
         {critical ? <Radio size={16} className="text-critical" /> : <Activity size={16} className="text-accent" />}
         <span className="font-medium">{critical ? "New disruption" : "Status change"}:</span>
         <Link href={`/console/${encodeURIComponent(shown.disruption_id)}`} className="hover:underline">

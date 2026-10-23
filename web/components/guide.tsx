@@ -147,6 +147,12 @@ const BY_ROLE: Partial<Record<Role, Step[]>> = {
   ],
   admin: [
     {
+      title: "Reports filed in error and passwords",
+      text:
+        "Revoke a report filed in error (a reporter's, a crew member's own sick report, planned leave) with a reason, until cover is approved; a plan waiting for approval is withdrawn with it. " +
+        "Reset a team member's password: you get a new random one to pass on, once. Only a super admin resets an admin's. Admins never submit or approve a plan.",
+    },
+    {
       title: "Rules and alerts",
       text:
         "Book planned leave (it is re-crewed in advance, with no urgency). Tighten legality thresholds (never looser than regulation; only a super admin may relax one back), read the " +
@@ -156,7 +162,7 @@ const BY_ROLE: Partial<Record<Role, Step[]>> = {
 };
 
 function Example({ children }: { children: ReactNode }) {
-  return <div className="rounded-2xl border border-line bg-sunken/60 p-3">{children}</div>;
+  return <div className="rounded-lg border border-line bg-sunken/60 p-3">{children}</div>;
 }
 
 function FeedRow({
@@ -173,7 +179,7 @@ function FeedRow({
   status: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white px-3 py-2">
+    <div className="rounded-md border border-line bg-white px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[11px] text-muted">13 Oct 05:00Z</span>
         <Status value={status} />
@@ -220,7 +226,7 @@ function StepVisual({ visual }: { visual: Visual }) {
             ].map(([k, v]) => (
               <div key={k} className="grid grid-cols-[9.5rem_1fr] gap-2">
                 <dt className="font-semibold">{k}</dt>
-                <dd className="text-slate-600">{v}</dd>
+                <dd className="text-muted">{v}</dd>
               </div>
             ))}
           </dl>
@@ -239,7 +245,7 @@ function StepVisual({ visual }: { visual: Visual }) {
             />
             <FeedRow id="r-gate-blr2" mine={false} what="BLR-G2 closed 00:00–08:00Z" airline="DX" status="TO_RESOLVE" />
           </div>
-          <ul className="mt-3 flex flex-col gap-1 text-xs text-slate-700">
+          <ul className="mt-3 flex flex-col gap-1 text-xs text-foreground">
             <li>
               <span className="rounded bg-pending-soft px-1.5 font-semibold text-amber-800">on your desk</span> yours to
               plan and submit.
@@ -271,7 +277,7 @@ function StepVisual({ visual }: { visual: Visual }) {
         <Example>
           <ul className="flex flex-col gap-1.5">
             {STATUS_MEANING.map(([s, m]) => (
-              <li key={s} className="grid grid-cols-[8.5rem_1fr] items-start gap-2 text-xs text-slate-700">
+              <li key={s} className="grid grid-cols-[8.5rem_1fr] items-start gap-2 text-xs text-foreground">
                 <span>
                   <Status value={s} />
                 </span>
@@ -284,7 +290,7 @@ function StepVisual({ visual }: { visual: Visual }) {
     case "engine":
       return (
         <Example>
-          <ul className="flex flex-col gap-1.5 text-xs text-slate-700">
+          <ul className="flex flex-col gap-1.5 text-xs text-foreground">
             <li>
               <b>Recommended:</b> the cheapest legal cover, with the next price and what cancelling would cost.
             </li>
@@ -312,7 +318,7 @@ function StepVisual({ visual }: { visual: Visual }) {
               <b>Competing for the same crew:</b> another disruption ranks this reserve too. Agree who takes whom, or
               build a joint plan.
             </p>
-            <p className="rounded-lg border border-indigo-200 bg-indigo-50/70 px-2 py-1.5 text-indigo-950">
+            <p className="rounded-lg border border-[#cfe0ef] bg-accent-soft/70 px-2 py-1.5 text-[#173f63]">
               <b>The same seat is also reported in r-…:</b> one person out on more days of one trip. Plan it once.
             </p>
           </div>
@@ -321,7 +327,7 @@ function StepVisual({ visual }: { visual: Visual }) {
     case "approve":
       return (
         <Example>
-          <ul className="flex flex-col gap-1 text-xs text-slate-700">
+          <ul className="flex flex-col gap-1 text-xs text-foreground">
             <li>
               <b>Approve…</b> asks you to confirm, then re-checks every rule and commits.
             </li>
@@ -337,7 +343,7 @@ function StepVisual({ visual }: { visual: Visual }) {
     case "reports":
       return (
         <Example>
-          <ul className="flex flex-col gap-1.5 text-xs text-slate-700">
+          <ul className="flex flex-col gap-1.5 text-xs text-foreground">
             <li className="flex items-center gap-2">
               <Status value="QUEUED" /> received, being checked against the roster.
             </li>
@@ -415,19 +421,16 @@ export function GuideButton() {
         step &&
         // On the page body: the top bar's blur would otherwise confine a fixed overlay to the bar.
         createPortal(
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-slate-900/30 p-4 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-          >
+          <div className="fixed inset-0 z-50 grid place-items-center bg-brand/30 p-4" onClick={() => setOpen(false)}>
             <div
               role="dialog"
               aria-modal
               aria-label="How CrewOps works"
-              className="animate-rise max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-accent">
+                <span className="text-xs font-semibold text-accent">
                   Step {i + 1} of {steps.length}
                 </span>
                 <button
@@ -438,14 +441,14 @@ export function GuideButton() {
                   <X size={16} />
                 </button>
               </div>
-              <h2 key={step.title} className="animate-rise mt-2 text-xl font-semibold">
+              <h2 key={step.title} className="mt-2 text-xl font-semibold">
                 {step.title}
               </h2>
-              <p key={`${step.title}-text`} className="animate-rise mt-2 text-sm leading-relaxed text-slate-700">
+              <p key={`${step.title}-text`} className="mt-2 text-sm leading-relaxed text-foreground">
                 {step.text}
               </p>
               {step.visual && (
-                <div key={`${step.title}-visual`} className="animate-rise mt-3">
+                <div key={`${step.title}-visual`} className="mt-3">
                   <StepVisual visual={step.visual} />
                 </div>
               )}

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 
 import { invocationUrl, settings } from "./config";
 import { ToolCallError, valueOf, type ToolResult } from "./mcp-result";
@@ -89,6 +90,9 @@ export async function callTool(accessToken: string, name: ToolName, args: Record
     } catch (err) {
       // A tool's own refusal is an answer, and the connection is fine.
       if (err instanceof ToolCallError) throw err;
+      // A timeout is a slow answer, not a broken connection: asking again would run the same
+      // (model-backed) question twice and double the wait.
+      if (err instanceof McpError && err.code === ErrorCode.RequestTimeout) throw err;
       // A transport failure (an ended session): drop that connection for every later call.
       drop(key, entry);
       failed = entry;

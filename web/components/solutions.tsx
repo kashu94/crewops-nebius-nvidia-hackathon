@@ -160,13 +160,13 @@ function OptionCard({
   return (
     <li
       className={cx(
-        "lift animate-rise rounded-xl border bg-surface",
+        "lift rounded-md border bg-surface",
         gone
           ? "border-red-200 bg-critical-soft/40"
           : chosen
             ? "border-emerald-300 bg-emerald-50/60 ring-2 ring-emerald-100"
             : option.rank === 1
-              ? "border-sky-300 ring-1 ring-sky-100"
+              ? "border-[#cfe0ef] ring-1 ring-[#cfe0ef]"
               : "border-line",
       )}
       style={{ animationDelay: `${option.rank * 50}ms` }}
@@ -179,25 +179,25 @@ function OptionCard({
         <span
           className={cx(
             "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold",
-            option.rank === 1 ? "bg-accent text-white" : "bg-slate-100 text-slate-600",
+            option.rank === 1 ? "bg-accent text-white" : "bg-sunken text-muted",
           )}
         >
           {option.rank}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline gap-x-2">
-            <span className={cx("font-semibold text-slate-900", gone && "text-red-800 line-through")}>
+            <span className={cx("font-semibold text-foreground", gone && "text-red-800 line-through")}>
               {option.name}
             </span>
             {gone && (
-              <span className="rounded-full bg-critical px-2 py-0.5 text-[10px] font-semibold text-white">
+              <span className="rounded-full bg-critical px-2 py-0.5 text-[11px] font-semibold text-white">
                 reported {gone.reason ?? "unavailable"} {day(gone.reported_utc)} {clock(gone.reported_utc)}
               </span>
             )}
-            {option.crew_id && <Mono className="text-sky-700">{option.crew_id}</Mono>}
+            {option.crew_id && <Mono className="text-[#173f63]">{option.crew_id}</Mono>}
             {option.crew_rank && <span className="text-xs text-muted">{option.crew_rank}</span>}
             {chosen && (
-              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
                 chosen
               </span>
             )}
@@ -221,7 +221,7 @@ function OptionCard({
         <ChevronDown size={16} className={cx("mt-1 shrink-0 text-muted transition", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="animate-rise border-t border-line px-3 pb-3 pt-2">
+        <div className="border-t border-line px-3 pb-3 pt-2">
           {Object.keys(option.cost_breakdown).length > 0 && (
             <p className="mb-2 text-xs text-muted">
               {Object.entries(option.cost_breakdown)
@@ -246,7 +246,7 @@ function OptionCard({
 function CancelCard({ seat }: { seat: Seat }) {
   const flights = seat.impact?.uncovered_flights ?? [];
   return (
-    <li className="lift animate-rise flex items-start gap-3 rounded-xl border border-red-200 bg-critical-soft/40 p-3">
+    <li className="lift flex items-start gap-3 rounded-md border border-red-200 bg-critical-soft/40 p-3">
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-critical text-white">
         <Ban size={14} />
       </span>
@@ -334,8 +334,8 @@ export function SeatOptions({
               gone={!decided && o.crew_id ? unavailable[o.crew_id] : undefined}
             />
           ))}
-          {decided && !options.some((o) => o.crew_id === chosen) && (
-            <li className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-900">
+          {decided && chosen && !options.some((o) => o.crew_id === chosen) && (
+            <li className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-900">
               Chosen: <Mono>{chosen}</Mono>, from beyond the top options shown here.
             </li>
           )}

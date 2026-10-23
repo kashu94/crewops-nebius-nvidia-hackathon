@@ -1,5 +1,5 @@
 import { signIn, SignInError } from "@/lib/cognito";
-import { declaredTooLarge } from "@/lib/limits";
+import { declaredTooLarge, parseJson, readCapped } from "@/lib/limits";
 import { saveTokens } from "@/lib/session";
 import { sameOrigin } from "@/lib/tools";
 
@@ -12,7 +12,11 @@ export async function POST(request: Request) {
   if (declaredTooLarge(request, 2_000)) {
     return Response.json({ error: "Request too large." }, { status: 413 });
   }
-  const body = (await request.json().catch(() => null)) as {
+  const text = await readCapped(request, 2_000);
+  if (text === null) {
+    return Response.json({ error: "Request too large." }, { status: 413 });
+  }
+  const body = parseJson(text) as {
     username?: unknown;
     password?: unknown;
   } | null;

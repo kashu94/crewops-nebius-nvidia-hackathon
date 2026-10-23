@@ -71,7 +71,7 @@ export function AirlineBadge({
       {compact ? (
         <span
           role="tooltip"
-          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover/airline:opacity-100 group-focus/airline:opacity-100"
+          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-brand px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-opacity duration-100 group-hover/airline:opacity-100 group-focus/airline:opacity-100"
         >
           {a.name} · {code}
         </span>

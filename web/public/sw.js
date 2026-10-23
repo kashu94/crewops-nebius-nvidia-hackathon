@@ -38,7 +38,11 @@ self.addEventListener("notificationclick", (event) => {
   const url = new URL(samePage(event.notification.data?.url), self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((open) => {
-      const tab = open.find((c) => new URL(c.url).origin === self.location.origin);
+      // never a desk speaker's tab: navigating it away would silence that desk's alerts
+      const tab = open.find((c) => {
+        const at = new URL(c.url);
+        return at.origin === self.location.origin && at.pathname !== "/speaker" && !at.pathname.startsWith("/speaker/");
+      });
       if (tab) {
         return tab
           .focus()

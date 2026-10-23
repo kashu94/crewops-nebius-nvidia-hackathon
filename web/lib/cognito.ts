@@ -4,6 +4,7 @@ import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
   NotAuthorizedException,
+  RevokeTokenCommand,
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider";
 
@@ -49,6 +50,16 @@ export async function signIn(username: string, password: string): Promise<Tokens
       throw new SignInError("Wrong username or password.");
     }
     throw err;
+  }
+}
+
+/** Ends a refresh token at Cognito, so a copy taken before sign-out stops working. Best
+ * effort: signing out still clears this browser's cookies if Cognito can't be reached. */
+export async function revoke(refreshToken: string): Promise<void> {
+  try {
+    await cognito().send(new RevokeTokenCommand({ ClientId: settings.clientId(), Token: refreshToken }));
+  } catch {
+    // already expired or revoked, or revocation is off for the app client
   }
 }
 

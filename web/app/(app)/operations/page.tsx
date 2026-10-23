@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AIRLINES, AirlineBadge } from "@/components/airline";
 import { useLiveListener } from "@/components/live";
@@ -105,7 +105,7 @@ function CrewChip({
   /** false for past days, which can't be reported */
   reportable?: boolean;
 }) {
-  if (!person) return <span className="text-[11px] text-slate-400">{label} —</span>;
+  if (!person) return <span className="text-[11px] text-muted">{label} —</span>;
   if (person.out) {
     return (
       <span
@@ -120,8 +120,8 @@ function CrewChip({
   }
   if (!reportable) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-slate-600">
-        <span className="font-semibold text-slate-400">{label}</span>
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted">
+        <span className="font-semibold text-muted">{label}</span>
         {person.name}
       </span>
     );
@@ -129,10 +129,10 @@ function CrewChip({
   return (
     <Link
       href={reportHref({ type: "crew_unavailable", crew_id: person.crew_id, from_date: date })}
-      className="group/chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-slate-700 transition hover:bg-rose-50 hover:text-rose-700"
+      className="group/chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-foreground transition hover:bg-rose-50 hover:text-rose-700"
       title={`Report ${person.name} (${person.crew_id}) unavailable on ${day(date)}`}
     >
-      <span className="font-semibold text-slate-400 group-hover/chip:text-rose-400">{label}</span>
+      <span className="font-semibold text-muted group-hover/chip:text-rose-400">{label}</span>
       {person.name}
     </Link>
   );
@@ -152,17 +152,17 @@ function Kpi({
   tone?: "slate" | "rose" | "amber" | "sky";
 }) {
   const tones = {
-    slate: "from-slate-50 text-slate-600",
-    rose: "from-rose-50 text-rose-600",
-    amber: "from-amber-50 text-amber-600",
-    sky: "from-sky-50 text-sky-600",
+    slate: "text-muted",
+    rose: "text-rose-600",
+    amber: "text-amber-600",
+    sky: "text-accent",
   };
   return (
-    <div className={cx("animate-rise rounded-2xl border border-line bg-gradient-to-br to-white p-4", tones[tone])}>
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]">
+    <div className={cx("rounded-lg border border-line bg-surface p-4", tones[tone])}>
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold">
         {icon} {label}
       </p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
       {sub && <div className="mt-1 text-[11px] text-muted">{sub}</div>}
     </div>
   );
@@ -206,9 +206,9 @@ function WeekChart({
             aria-selected={on}
             onClick={() => onSelect(d.date)}
             className={cx(
-              "group flex flex-col items-stretch rounded-xl border p-2 text-left transition",
+              "group flex flex-col items-stretch rounded-md border p-2 text-left transition",
               on
-                ? "border-accent bg-accent-soft/60 ring-1 ring-sky-200"
+                ? "border-accent bg-accent-soft/60 ring-1 ring-[#cfe0ef]"
                 : "border-transparent hover:border-line hover:bg-sunken",
             )}
           >
@@ -229,20 +229,21 @@ function WeekChart({
                 )}
               </div>
             </div>
-            <span className="mt-2 text-center text-[11px] uppercase tracking-wide text-muted">{weekday(d.date)}</span>
+            <span className="mt-2 text-center text-[11px] text-muted">{weekday(d.date)}</span>
             <span
-              className={cx("text-center text-lg font-semibold leading-tight", on ? "text-sky-900" : "text-slate-800")}
+              className={cx(
+                "text-center text-lg font-semibold leading-tight",
+                on ? "text-[#173f63]" : "text-foreground",
+              )}
             >
               {Number(d.date.slice(8, 10))}
             </span>
-            <span className="text-center text-[11px] tabular-nums text-slate-600">
-              {d.pax.toLocaleString("en-IN")} pax
-            </span>
-            <span className="text-center text-[10px] tabular-nums text-muted">{d.total} flights</span>
+            <span className="text-center text-[11px] tabular-nums text-muted">{d.pax.toLocaleString("en-IN")} pax</span>
+            <span className="text-center text-[11px] tabular-nums text-muted">{d.total} flights</span>
             <span className="mt-1.5 flex min-h-[18px] flex-wrap justify-center gap-1">
               {d.away > 0 && (
                 <span
-                  className="inline-flex items-center gap-0.5 rounded-full bg-rose-100 px-1.5 text-[10px] font-semibold text-rose-700"
+                  className="inline-flex items-center gap-0.5 rounded-full bg-rose-100 px-1.5 text-[11px] font-semibold text-rose-700"
                   title="Crew reported unavailable"
                 >
                   <HeartPulse size={9} /> {d.away}
@@ -250,7 +251,7 @@ function WeekChart({
               )}
               {d.hit > 0 && (
                 <span
-                  className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800"
+                  className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800"
                   title="Open disruptions"
                 >
                   <AlertTriangle size={9} /> {d.hit}
@@ -265,17 +266,17 @@ function WeekChart({
 }
 
 function Load({ booked, seats }: { booked: number | null; seats: number }) {
-  if (booked == null) return <span className="text-[11px] text-slate-400">—</span>;
+  if (booked == null) return <span className="text-[11px] text-muted">—</span>;
   const pct = Math.min(100, Math.round((booked / Math.max(1, seats)) * 100));
   return (
     <div className="w-20" title={`${booked} of ${seats} seats booked`}>
-      <div className="flex justify-between text-[10px] tabular-nums text-muted">
+      <div className="flex justify-between text-[11px] tabular-nums text-muted">
         <span>{booked}</span>
         <span>{pct}%</span>
       </div>
-      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-sunken">
         <div
-          className={cx("h-full rounded-full", pct >= 90 ? "bg-indigo-500" : "bg-sky-400")}
+          className={cx("h-full rounded-full", pct >= 90 ? "bg-pending" : "bg-accent")}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -296,7 +297,7 @@ function FlightRow({ f, today }: { f: Flight; today: string }) {
       className={cx(
         "grid items-center gap-x-4 gap-y-2 border-l-[3px] px-4 py-2.5 sm:grid-cols-[80px_minmax(0,1.1fr)_minmax(0,1.6fr)_auto]",
         f.cancelled
-          ? "border-l-slate-300 bg-slate-50 opacity-70"
+          ? "border-l-slate-300 bg-sunken opacity-70"
           : worst?.severity === "high"
             ? "border-l-red-500 bg-red-50/30"
             : worst || crewOut
@@ -305,7 +306,7 @@ function FlightRow({ f, today }: { f: Flight; today: string }) {
       )}
     >
       <div>
-        <Mono className="text-sm font-semibold text-slate-900">{clock(f.dep_utc)}</Mono>
+        <Mono className="text-sm font-semibold text-foreground">{clock(f.dep_utc)}</Mono>
         <p className="text-[11px] text-muted">
           arr <Mono>{clock(f.arr_utc)}</Mono>
         </p>
@@ -315,14 +316,14 @@ function FlightRow({ f, today }: { f: Flight; today: string }) {
           <AirlineBadge code={f.airline} compact />
           <Mono className="text-sm font-semibold">{f.flight_no}</Mono>
           {f.cancelled && (
-            <span className="inline-flex items-center gap-1 rounded bg-slate-200 px-1.5 text-[10px] font-semibold text-slate-700">
+            <span className="inline-flex items-center gap-1 rounded bg-active px-1.5 text-[11px] font-semibold text-foreground">
               <Ban size={10} /> Cancelled
             </span>
           )}
         </p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-600">
-          <Mono>{f.from}</Mono> <ArrowRight size={11} className="text-slate-400" /> <Mono>{f.to}</Mono>
-          <span className="text-slate-300">·</span>
+        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+          <Mono>{f.from}</Mono> <ArrowRight size={11} className="text-muted" /> <Mono>{f.to}</Mono>
+          <span className="text-[#9a9c9f]">·</span>
           <Mono className="text-muted">
             {f.aircraft} {f.aircraft_type}
           </Mono>
@@ -350,7 +351,7 @@ function FlightRow({ f, today }: { f: Flight; today: string }) {
           {f.disruptions.map((d) => (
             <span key={d.disruption_id} className="inline-flex items-center gap-1">
               <SeverityBadge severity={d.severity ? { level: d.severity } : null} />
-              <Mono className="text-[10px] text-muted">{d.disruption_id}</Mono>
+              <Mono className="text-[11px] text-muted">{d.disruption_id}</Mono>
             </span>
           ))}
           {!f.cancelled && ahead && (
@@ -377,17 +378,25 @@ export default function Operations() {
   const [onlyIssues, setOnlyIssues] = useState(false);
 
   const [start, setStart] = useState("");
+  // Only the newest request may land: an earlier week answering late must not replace it.
+  const latest = useRef(0);
   const load = useMemo(
-    () => () =>
-      tool<Week>("operations_overview", start ? { start } : {}).then(
+    () => () => {
+      const request = ++latest.current;
+      return tool<Week>("operations_overview", start ? { start } : {}).then(
         (w) => {
+          if (request !== latest.current) return;
           setData(w);
+          setError(null);
           // keep the selected day if it's in this week, else today, else the week's first day
           const today = w.window?.today ?? "";
           setSelected((s) => (s && w.week.includes(s) ? s : w.week.includes(today) ? today : (w.week[0] ?? null)));
         },
-        (err: Error) => setError(err.message),
-      ),
+        (err: Error) => {
+          if (request === latest.current) setError(err.message);
+        },
+      );
+    },
     [start],
   );
   useEffect(() => {
@@ -419,7 +428,8 @@ export default function Operations() {
     });
   }, [data, date, airline, query, onlyIssues]);
 
-  if (error) return <Notice tone="error">{error}</Notice>;
+  // A failed refresh keeps the board it already has, with the error above it.
+  if (error && !data) return <Notice tone="error">{error}</Notice>;
   if (!data) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted">
@@ -444,9 +454,10 @@ export default function Operations() {
 
   return (
     <div className="flex flex-col gap-5">
+      {error && <Notice tone="error">{error}</Notice>}
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">Operations</p>
+          <p className="text-[11px] font-semibold text-accent">Operations</p>
           <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
             Week of {day(data.week[0])} – {day(data.week[data.week.length - 1])}
             {data.window && (
@@ -455,7 +466,7 @@ export default function Operations() {
                   type="button"
                   onClick={() => setStart(shiftDays(data.week[0], -7))}
                   disabled={data.week[0] <= data.window.from}
-                  className="rounded-lg border border-line px-2 py-1 text-slate-600 transition hover:bg-sunken disabled:opacity-40"
+                  className="rounded-lg border border-line px-2 py-1 text-muted transition hover:bg-sunken disabled:opacity-40"
                   aria-label="Previous week"
                 >
                   ←
@@ -463,7 +474,7 @@ export default function Operations() {
                 <button
                   type="button"
                   onClick={() => setStart(data.window!.today)}
-                  className="rounded-lg border border-line px-2.5 py-1 text-slate-600 transition hover:bg-sunken"
+                  className="rounded-lg border border-line px-2.5 py-1 text-muted transition hover:bg-sunken"
                 >
                   Today
                 </button>
@@ -471,7 +482,7 @@ export default function Operations() {
                   type="button"
                   onClick={() => setStart(shiftDays(data.week[0], 7))}
                   disabled={data.week[data.week.length - 1] >= data.window.to}
-                  className="rounded-lg border border-line px-2 py-1 text-slate-600 transition hover:bg-sunken disabled:opacity-40"
+                  className="rounded-lg border border-line px-2 py-1 text-muted transition hover:bg-sunken disabled:opacity-40"
                   aria-label="Next week"
                 >
                   →
@@ -486,7 +497,7 @@ export default function Operations() {
         </div>
         <Link
           href="/report"
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
         >
           <AlertTriangle size={15} /> Record a disruption
         </Link>
@@ -573,15 +584,12 @@ export default function Operations() {
         >
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
             <label className="relative min-w-[180px] flex-1">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Flight, station, aircraft or crew"
-                className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-8 text-sm outline-none focus:border-accent focus:ring-4 focus:ring-sky-100"
+                className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-8 text-sm outline-none focus:border-accent focus:ring-4 focus:ring-[#cfe0ef]"
               />
               {query && (
                 <button
@@ -589,7 +597,7 @@ export default function Operations() {
                   onClick={() => setQuery("")}
                   aria-label="Clear the search"
                   title="Clear"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-sunken hover:text-slate-700"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:bg-sunken hover:text-foreground"
                 >
                   <X size={13} />
                 </button>
@@ -600,7 +608,7 @@ export default function Operations() {
                 onClick={() => setAirline(null)}
                 className={cx(
                   "rounded-lg px-2.5 py-1 text-xs font-medium",
-                  !airline ? "bg-slate-900 text-white" : "text-muted hover:bg-sunken",
+                  !airline ? "bg-brand text-white" : "text-muted hover:bg-sunken",
                 )}
               >
                 All
@@ -611,7 +619,7 @@ export default function Operations() {
                   onClick={() => setAirline(airline === code ? null : code)}
                   className={cx(
                     "flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition",
-                    airline === code ? "bg-slate-900 text-white" : "text-muted hover:bg-sunken",
+                    airline === code ? "bg-brand text-white" : "text-muted hover:bg-sunken",
                   )}
                   title={a.name}
                 >
@@ -624,7 +632,7 @@ export default function Operations() {
                 type="checkbox"
                 checked={onlyIssues}
                 onChange={(e) => setOnlyIssues(e.target.checked)}
-                className="accent-sky-600"
+                className="accent-[#1f5f99]"
               />
               Only affected
             </label>
@@ -647,9 +655,9 @@ export default function Operations() {
             <Empty icon={<HeartPulse size={22} />}>Nobody is reported unavailable this week.</Empty>
           ) : (
             <ul className="flex flex-col gap-2">
-              {data.unavailable.map((o) => (
+              {data.unavailable.map((o, i) => (
                 <li
-                  key={`${o.disruption_id}-${o.crew_id}`}
+                  key={`${o.disruption_id ?? i}-${o.crew_id}-${o.from_date ?? ""}`}
                   className={cx(
                     "rounded-xl border p-3 transition",
                     spans(o, date) ? "border-rose-200 bg-rose-50/60" : "border-line",
@@ -682,9 +690,9 @@ export default function Operations() {
                         key={d}
                         title={day(d)}
                         className={cx(
-                          "grid h-6 w-6 place-items-center rounded-md text-[10px] font-semibold",
-                          spans(o, d) ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-400",
-                          d === date && "ring-2 ring-sky-400 ring-offset-1",
+                          "grid h-6 w-6 place-items-center rounded-md text-[11px] font-semibold",
+                          spans(o, d) ? "bg-rose-500 text-white" : "bg-sunken text-muted",
+                          d === date && "ring-2 ring-accent ring-offset-1",
                         )}
                       >
                         {Number(d.slice(8, 10))}
@@ -692,7 +700,7 @@ export default function Operations() {
                     ))}
                   </div>
                   {o.disruption_id && (
-                    <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
+                    <p className="mt-1.5 flex items-center gap-1 text-[11px] text-muted">
                       <Clock3 size={10} />
                       {o.self_reported ? "Reported by themselves" : "Reported by the desk"} ·{" "}
                       <Mono>{o.disruption_id}</Mono>

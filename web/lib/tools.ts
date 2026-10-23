@@ -29,10 +29,15 @@ export const TOOLS = {
   reject_plan: { list: false, write: true },
   withdraw_plan: { list: false, write: true },
   close_disruption: { list: false, write: true },
+  confirm_resolution: { list: false, write: true },
+  return_resolution: { list: false, write: true },
   suggest_cover: { list: false, write: true },
   alert_addresses: { list: true, write: false },
   add_alert_address: { list: false, write: true },
   remove_alert_address: { list: false, write: true },
+  revoke_report: { list: false, write: true },
+  team_accounts: { list: true, write: false },
+  reset_password: { list: false, write: true },
 } as const;
 
 export type ToolName = keyof typeof TOOLS;
@@ -41,14 +46,26 @@ export function isTool(name: string): name is ToolName {
   return Object.prototype.hasOwnProperty.call(TOOLS, name);
 }
 
-/** A state-changing request must come from this site: browsers send Origin on POST. */
+/** A state-changing request must come from this site: browsers send Origin on POST. Behind a
+ * proxy the site's host is the first `x-forwarded-host` entry (a chain of proxies lists
+ * several) or `host`, either of which may carry the default port. A cross-site page can set
+ * neither, so accepting either match lets no other site in. */
 export function sameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  let site: URL;
   try {
-    return new URL(origin).host === host;
+    site = new URL(origin);
   } catch {
     return false;
   }
+  const forwarded = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  return [forwarded, request.headers.get("host")].some((host) => {
+    if (!host) return false;
+    try {
+      return new URL(`${site.protocol}//${host}`).host === site.host;
+    } catch {
+      return false;
+    }
+  });
 }

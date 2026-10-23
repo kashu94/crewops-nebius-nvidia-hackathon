@@ -8,7 +8,7 @@ export function ReCrewed({ seat }: { seat: Seat }) {
   if (!r) return null;
   const who = r.holders.map((h) => `${h.name ?? h.crew_id} (${h.crew_id})`).join(", ");
   return (
-    <p className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-ok-soft px-3 py-2 text-sm text-emerald-950">
+    <p className="flex items-start gap-2 rounded-md border border-emerald-200 bg-ok-soft px-3 py-2 text-sm text-emerald-950">
       <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
       <span>
         <b>Already re-crewed.</b>{" "}

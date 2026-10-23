@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-import { refresh, type Tokens } from "./cognito";
+import { refresh, revoke, type Tokens } from "./cognito";
 import { expiresSoon } from "./tokens";
 
 // The tokens live in httpOnly cookies: page scripts never see the access or refresh
@@ -31,6 +31,13 @@ export async function saveTokens(tokens: Tokens): Promise<void> {
 export async function clearTokens(): Promise<void> {
   const jar = await cookies();
   for (const name of [ACCESS, ID, REFRESH]) jar.delete(name);
+}
+
+/** Signing out: the refresh token is revoked at Cognito, then the cookies go. */
+export async function signOut(): Promise<void> {
+  const stored = (await cookies()).get(REFRESH)?.value;
+  if (stored) await revoke(stored);
+  await clearTokens();
 }
 
 /** Current tokens, refreshed first when they are about to expire; null when signed out. */

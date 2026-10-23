@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertOctagon,
   Building2,
   CalendarDays,
   CheckCheck,
@@ -14,6 +13,7 @@ import {
   ShieldCheck,
   Sparkles,
   Swords,
+  Users,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -44,7 +44,7 @@ function SameSeat({ detail }: { detail: Detail }) {
   const same = detail.same_seat ?? [];
   if (same.length === 0) return null;
   return (
-    <p className="flex items-start gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-2 text-sm text-indigo-950">
+    <p className="flex items-start gap-2 rounded-md border border-[#cfe0ef] bg-accent-soft/70 px-3 py-2 text-sm text-[#173f63]">
       <Link2 size={15} className="mt-0.5 shrink-0" />
       <span>
         <b>The same seat is also reported in </b>
@@ -83,14 +83,14 @@ function OwnerBanner({ detail }: { detail: Detail }) {
   const names = desks.map((d) => `${d.desk_id} (${d.controller})`).join(" and ");
   if (detail.yours) {
     return (
-      <p className="flex items-center gap-2 rounded-xl border border-sky-200 bg-accent-soft px-3 py-2 text-sm text-sky-900">
+      <p className="flex items-center gap-2 rounded-md border border-[#cfe0ef] bg-accent-soft px-3 py-2 text-sm text-[#173f63]">
         <Building2 size={15} /> On your desk{desks.length > 1 ? `, shared with ${names}` : ""}.
       </p>
     );
   }
   if (me.roles.includes("controller")) {
     return (
-      <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-pending-soft px-3 py-2 text-sm text-amber-900">
+      <p className="flex items-start gap-2 rounded-md border border-amber-200 bg-pending-soft px-3 py-2 text-sm text-amber-900">
         <Swords size={15} className="mt-0.5 shrink-0" />
         <span>
           This is <b>{names}</b>&apos;s disruption. You can read and analyse it; planning it is theirs.
@@ -101,7 +101,7 @@ function OwnerBanner({ detail }: { detail: Detail }) {
     );
   }
   return (
-    <p className="flex items-center gap-2 rounded-xl border border-line bg-sunken px-3 py-2 text-sm text-slate-700">
+    <p className="flex items-center gap-2 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-foreground">
       <Building2 size={15} /> Desk: {names}.
     </p>
   );
@@ -120,7 +120,7 @@ export function Coverage({ detail }: { detail: Detail }) {
     stats = [
       { label: "Duty dates", value: dates.size, icon: CalendarDays },
       { label: "Flights uncrewed", value: uncrewed.size, icon: Plane },
-      { label: "Passengers booked", value: booked, icon: AlertOctagon },
+      { label: "Passengers booked", value: booked, icon: Users },
       { label: "Stations", value: stations.size, icon: MapPin },
     ];
   } else {
@@ -130,14 +130,14 @@ export function Coverage({ detail }: { detail: Detail }) {
       { label: "Flights affected", value: flights.length, icon: Plane },
       { label: "Leaving late", value: flights.filter((f) => f.late_minutes > 0).length, icon: CalendarDays },
       { label: "Gate moves", value: stands.length, icon: MapPin },
-      { label: "Passengers booked", value: flights.reduce((n, f) => n + (f.booked ?? 0), 0), icon: AlertOctagon },
+      { label: "Passengers booked", value: flights.reduce((n, f) => n + (f.booked ?? 0), 0), icon: Users },
     ];
   }
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" title="From the roster, the gate plan and the bookings">
       {stats.map(({ label, value, icon: Icon }) => (
-        <div key={label} className="animate-rise rounded-2xl border border-line bg-surface p-3 shadow-sm">
-          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <div key={label} className="rounded-lg border border-line bg-surface p-3">
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
             <Icon size={12} /> {label}
           </span>
           <span className="mt-1 block font-mono text-2xl font-semibold tabular-nums">
@@ -154,14 +154,14 @@ export function Recommendation({ seat }: { seat: Seat }) {
   const [best, next] = seat.options;
   if (!best || seat.re_crewed) return null;
   return (
-    <div className="animate-rise relative overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-4">
-      <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
+    <div className="relative overflow-hidden rounded-lg border border-[#cfe0ef] bg-surface p-4">
+      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#173f63]">
         <Sparkles size={13} /> Recommended for <Mono>{seat.pairing_id}</Mono> · {seat.role}
       </span>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xl font-semibold">
-            {best.name} <Mono className="text-base text-sky-700">{best.crew_id}</Mono>
+            {best.name} <Mono className="text-base text-[#173f63]">{best.crew_id}</Mono>
           </p>
           <p className="text-sm text-muted">
             {STRATEGY[best.strategy] ?? best.strategy}
@@ -192,7 +192,7 @@ export function TripFacts({ seat }: { seat: Seat }) {
   if (!c) return null;
   return (
     <div className="flex flex-col gap-3 text-sm">
-      {c.requirement && <p className="rounded-lg bg-sunken px-3 py-2 text-xs text-slate-700">{c.requirement}</p>}
+      {c.requirement && <p className="rounded-lg bg-sunken px-3 py-2 text-xs text-foreground">{c.requirement}</p>}
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
         <dt className="text-muted">Aircraft</dt>
         <dd>
@@ -221,7 +221,7 @@ export function TripFacts({ seat }: { seat: Seat }) {
             </Mono>
             <span
               className={cx(
-                "ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                "ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold",
                 f.state === "uncrewed"
                   ? "bg-critical-soft text-red-800"
                   : f.state === "at_risk"
@@ -240,7 +240,7 @@ export function TripFacts({ seat }: { seat: Seat }) {
             key={`${m.crew_id}-${m.role}`}
             className={cx(
               "rounded-lg px-2 py-1 text-[11px]",
-              m.state === "out" ? "bg-critical-soft text-red-900" : "bg-sunken text-slate-700",
+              m.state === "out" ? "bg-critical-soft text-red-900" : "bg-sunken text-foreground",
             )}
             title={m.state === "out" ? "Unavailable" : "Rostered"}
           >
@@ -281,7 +281,7 @@ export function AuditTrail({ audit }: { audit: AuditRow[] }) {
       <span aria-hidden className="absolute bottom-1 left-[5px] top-1 w-px bg-line" />
       {mergeAudit(audit).map((a, i) => (
         <li key={i} className="relative flex gap-3 text-sm">
-          <span className="relative z-10 mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-white bg-accent ring-1 ring-sky-200" />
+          <span className="relative z-10 mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-white bg-accent ring-1 ring-[#cfe0ef]" />
           <span className="min-w-0">
             <span className="block font-medium">{a.label}</span>
             <span className="block text-xs text-muted">
@@ -296,7 +296,7 @@ export function AuditTrail({ audit }: { audit: AuditRow[] }) {
                 </>
               )}
             </span>
-            {a.reason && <span className="block text-xs text-slate-600">“{a.reason}”</span>}
+            {a.reason && <span className="block text-xs text-muted">“{a.reason}”</span>}
           </span>
         </li>
       ))}
@@ -309,7 +309,7 @@ export function PlanList({ plans }: { plans: Plan[] }) {
   return (
     <ul className="flex flex-col gap-3">
       {plans.map((p) => (
-        <li key={p.plan_id} className="rounded-xl border border-line p-3">
+        <li key={p.plan_id} className="rounded-md border border-line p-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Mono className="font-semibold">{p.plan_id}</Mono>
             <Status value={p.status} />
@@ -369,14 +369,23 @@ export function CommittedPlan({ detail }: { detail: Detail }) {
   const plan = detail.plans.find((p) => p.status === "COMMITTED");
   if (!plan) return null;
   return (
-    <section className="animate-rise rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-800">
+    <section className="rounded-lg border border-emerald-200 bg-surface p-4">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800">
         <ShieldCheck size={13} /> Committed plan <Mono className="font-normal normal-case">{plan.plan_id}</Mono>
       </p>
       <ul className="mt-2 flex flex-col gap-1 text-sm">
         {(plan.picks ?? []).map((p) => (
           <li key={`${p.pairing_id}-${p.role}-${p.crew_id}`}>
-            <b>{p.name}</b> <Mono className="text-sky-700">{p.crew_id}</Mono> flies {p.role} on{" "}
+            {p.crew_id ? (
+              <>
+                <b>{p.name}</b> <Mono className="text-[#173f63]">{p.crew_id}</Mono> flies {p.role} on{" "}
+              </>
+            ) : (
+              // cancelled, or operated one short: nobody flies the seat
+              <>
+                <b>{p.name}</b> for {p.role} on{" "}
+              </>
+            )}
             <Mono>{p.pairing_id}</Mono>
             {p.replaces && (
               <>
@@ -471,21 +480,26 @@ export function Actions({
   }
 
   if (!canPlan && !canDecide && !canWithdraw) {
+    // After an action the reload can leave nothing for this role to do (an approval found
+    // stale, a plan sent back), so the outcome is kept above the status line.
     return (
-      <p className="flex items-center gap-2 text-xs text-muted">
-        <Lock size={13} />
-        {detail.status === "COMMITTED"
-          ? "Committed: the roster has been changed."
-          : detail.status === "CLOSED"
-            ? "Resolved: see the remark on the audit trail."
-            : pending
-              ? pending.submitted_by === me.user_id
-                ? "Waiting for a different approver."
-                : "A plan is waiting for an approver."
-              : isController && !detail.yours
-                ? `Only ${owner(detail)} can plan this one; you can read it.`
-                : "Nothing for your role to do here."}
-      </p>
+      <div className="flex flex-col gap-3">
+        {message && <Notice tone={message.tone}>{message.text}</Notice>}
+        <p className="flex items-center gap-2 text-xs text-muted">
+          <Lock size={13} />
+          {detail.status === "COMMITTED"
+            ? "Committed: the roster has been changed."
+            : detail.status === "CLOSED"
+              ? "Resolved: see the remark on the audit trail."
+              : pending
+                ? pending.submitted_by === me.user_id
+                  ? "Waiting for a different approver."
+                  : "A plan is waiting for an approver."
+                : isController && !detail.yours
+                  ? `Only ${owner(detail)} can plan this one; you can read it.`
+                  : "Nothing for your role to do here."}
+        </p>
+      </div>
     );
   }
 
@@ -582,15 +596,15 @@ export function Actions({
                 type="button"
                 tone={internal ? "accent" : "secondary"}
                 disabled={busy || !reason.trim()}
-                onClick={() => act("close_disruption", { reason }, internal ? "Resolved" : "Closed")}
+                onClick={() => act("close_disruption", { reason }, "Sent to an approver for sign-off")}
               >
                 {internal ? <CheckCircle2 size={14} /> : null}
-                {internal ? "Mark resolved" : "Close without a plan"}
+                {internal ? "Mark resolved" : "Close the disruption"}
               </Button>
               <p className="text-[11px] text-muted">
                 {internal
-                  ? "No crew change is needed. The remark goes on the audit trail and to whoever reported it."
-                  : "Only when no seat can be covered, for example the flights were cancelled."}
+                  ? "No crew change is needed. An approver signs it off; the remark goes on the audit trail and to whoever reported it."
+                  : "When it has been dealt with another way, for example the flights were cancelled. An approver signs it off."}
               </p>
             </div>
           )}
@@ -658,19 +672,19 @@ export function JointPlan({ detail }: { detail: Detail }) {
   // Only meaningful when several seats are covered together.
   if (detail.seats.length < 2 || !joint?.assignments?.length) return null;
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 text-xs">
-      <p className="mb-1 flex items-center gap-1 font-semibold text-indigo-900">
+    <div className="rounded-md border border-[#cfe0ef] bg-accent-soft/50 p-3 text-xs">
+      <p className="mb-1 flex items-center gap-1 font-semibold text-[#173f63]">
         Joint plan for every seat together <Info term="joint" />
       </p>
       <ul className="flex flex-col gap-1">
         {joint.assignments.map((a, i) => (
-          <li key={i} className="font-mono text-indigo-900">
+          <li key={i} className="font-mono text-[#173f63]">
             {String(a.pairing_id)} {String(a.role)}: {String(a.name ?? a.crew_id)} ({String(a.crew_id)})
           </li>
         ))}
       </ul>
       {joint.total_cost_inr !== undefined && (
-        <p className="mt-1 text-indigo-900">Total {rupees(joint.total_cost_inr)}</p>
+        <p className="mt-1 text-[#173f63]">Total {rupees(joint.total_cost_inr)}</p>
       )}
     </div>
   );

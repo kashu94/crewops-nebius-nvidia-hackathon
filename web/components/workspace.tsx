@@ -72,7 +72,7 @@ function SpecialRow({
   return (
     <li
       className={cx(
-        "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm",
+        "flex items-center gap-3 rounded-md border px-3 py-2.5 text-sm",
         tone === "red" ? "bg-critical-soft/60 text-red-900" : "bg-pending-soft/60 text-amber-900",
         selected
           ? tone === "red"
@@ -93,7 +93,7 @@ function SpecialRow({
               ? tone === "red"
                 ? "border-red-600 bg-red-600 text-white"
                 : "border-amber-600 bg-amber-600 text-white"
-              : "border-slate-300 bg-white hover:border-accent",
+              : "border-control bg-white hover:border-accent",
           )}
         >
           {selected && <Check size={12} strokeWidth={3} />}
@@ -121,7 +121,7 @@ function SpecialWarning({ seat, kind, cost }: { seat: Seat; kind: string; cost: 
   const flights = (seat.impact?.uncovered_flights ?? []).map((f) => f.split("-")[0]);
   const trip = tripFlights(seat);
   return kind === CANCEL ? (
-    <section className="animate-rise flex gap-3 rounded-2xl border border-red-200 bg-critical-soft/60 p-4 text-sm text-red-900">
+    <section className="flex gap-3 rounded-lg border border-red-200 bg-critical-soft/60 p-4 text-sm text-red-900">
       <AlertTriangle size={18} className="mt-0.5 shrink-0" />
       <p className="leading-relaxed">
         <b>Cancel the whole trip: {trip.names.join(", ")}.</b> {trip.booked.toLocaleString("en-IN")} booked passengers
@@ -130,7 +130,7 @@ function SpecialWarning({ seat, kind, cost }: { seat: Seat; kind: string; cost: 
       </p>
     </section>
   ) : (
-    <section className="animate-rise flex gap-3 rounded-2xl border border-amber-200 bg-pending-soft/60 p-4 text-sm text-amber-900">
+    <section className="flex gap-3 rounded-lg border border-amber-200 bg-pending-soft/60 p-4 text-sm text-amber-900">
       <AlertTriangle size={18} className="mt-0.5 shrink-0" />
       <p className="leading-relaxed">
         <b>Operate one cabin crew short on {flights.join(", ")}.</b> The trip still has the minimum of one cabin crew
@@ -188,7 +188,7 @@ function Competing({ seat, contention }: { seat: Seat; contention: Record<string
   }
 
   return (
-    <section className="animate-rise rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-4">
+    <section className="rounded-lg border border-amber-200 bg-surface p-4">
       <h3 className="flex items-center gap-2 font-semibold text-amber-900">
         <AlertTriangle size={16} /> Competing for the same crew <Info term="contention" />
       </h3>
@@ -203,7 +203,7 @@ function Competing({ seat, contention }: { seat: Seat; contention: Record<string
       </p>
       <ul className="mt-3 flex flex-col gap-2">
         {contended.map((o) => (
-          <li key={o.crew_id} className="rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm">
+          <li key={o.crew_id} className="rounded-md border border-amber-100 bg-white px-3 py-2 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <Mono className="font-semibold">{o.crew_id}</Mono>
               <span>{o.name}</span>
@@ -221,10 +221,10 @@ function Competing({ seat, contention }: { seat: Seat; contention: Record<string
                 <span key={`${r.disruption_id}-${r.pairing_id}-${r.kind}-${r.rank ?? r.plan_id}`}>
                   {i > 0 && ", "}
                   {me.desk && r.desks.some((d) => d.desk_id === me.desk) ? (
-                    <b className="text-slate-700">your desk</b>
+                    <b className="text-foreground">your desk</b>
                   ) : (
                     <>
-                      <b className="text-slate-700">{r.desks.map((d) => d.controller).join(" / ")}</b>&apos;s desk
+                      <b className="text-foreground">{r.desks.map((d) => d.controller).join(" / ")}</b>&apos;s desk
                     </>
                   )}{" "}
                   on <Mono>{r.pairing_id}</Mono> ({r.disruption_id},{" "}
@@ -249,7 +249,7 @@ function Competing({ seat, contention }: { seat: Seat; contention: Record<string
         </li>
       </ul>
       {me.roles.includes("controller") && rivalOut.length > 0 && (
-        <div className="mt-4 rounded-xl border border-line bg-white p-3">
+        <div className="mt-4 rounded-md border border-line bg-white p-3">
           <p className="flex items-center gap-2 text-sm font-semibold">
             <GitMerge size={15} className="text-accent" /> Resolve these together
           </p>
@@ -278,7 +278,7 @@ function JointView({ joint }: { joint: { ok: boolean; result?: JointResult; erro
     return <p className="mt-2 text-xs text-critical">{joint.error ?? "No joint plan."}</p>;
   const r = joint.result;
   return (
-    <div className="animate-rise mt-3 rounded-lg bg-indigo-50/60 p-3 text-xs">
+    <div className="mt-3 rounded-lg bg-accent-soft/60 p-3 text-xs">
       <ul className="flex flex-col gap-1">
         {r.assignments?.map((a) => (
           <li key={`${a.pairing_id}-${a.role}-${a.crew_id}`} className="flex justify-between gap-2">
@@ -313,7 +313,7 @@ function Narrative({ seat, option }: { seat: Seat; option: LiveOption }) {
   const runnerUp = options.find((o) => o.crew_id !== option.crew_id);
   const passengers = passengersProtected(seat);
   return (
-    <section className="animate-rise rounded-2xl border border-line bg-surface p-4">
+    <section className="rounded-lg border border-line bg-surface p-4">
       <p className="text-[15px] leading-relaxed">
         Assign <b>{option.name}</b> <Mono>{option.crew_id}</Mono> ({STRATEGY[option.strategy] ?? option.strategy}).{" "}
         {option.delay_hours > 0
@@ -328,7 +328,7 @@ function Narrative({ seat, option }: { seat: Seat; option: LiveOption }) {
             ? `Uses no reserve: all ${reservesLeft} reserve ${seat.role}(s) among the legal options stay free.`
             : "Uses no reserve."}
       </p>
-      <ul className="mt-3 list-disc pl-5 text-sm text-slate-700">
+      <ul className="mt-3 list-disc pl-5 text-sm text-foreground">
         {extra > 0 && cheapest && (
           <li>
             {rupees(extra)} more than the cheapest legal option ({cheapest.name}, {rupees(cheapest.cost_inr)}).
@@ -403,7 +403,7 @@ function OptionRow({
           ? "border-red-200 bg-critical-soft/50"
           : selected
             ? "border-emerald-300 bg-emerald-50/70"
-            : "border-transparent bg-sunken hover:border-sky-200",
+            : "border-transparent bg-sunken hover:border-[#cfe0ef]",
       )}
     >
       <div className="flex items-center gap-3 px-3 py-2.5">
@@ -415,9 +415,7 @@ function OptionRow({
             title={selected ? "Chosen" : "Choose this option"}
             className={cx(
               "grid h-5 w-5 shrink-0 place-items-center rounded-full border transition",
-              selected
-                ? "border-emerald-500 bg-emerald-500 text-white"
-                : "border-slate-300 bg-white hover:border-accent",
+              selected ? "border-emerald-500 bg-emerald-500 text-white" : "border-control bg-white hover:border-accent",
             )}
           >
             {selected && <Check size={12} strokeWidth={3} />}
@@ -431,7 +429,7 @@ function OptionRow({
         >
           <span className={cx("font-medium", gone && "text-red-800 line-through")}>{option.name}</span>
           {gone && (
-            <span className="shrink-0 rounded-full bg-critical px-2 py-0.5 text-[10px] font-semibold text-white">
+            <span className="shrink-0 rounded-full bg-critical px-2 py-0.5 text-[11px] font-semibold text-white">
               reported {gone.reason ?? "unavailable"} {day(gone.reported_utc)} {clock(gone.reported_utc)} ·{" "}
               {gone.disruption_id}
             </span>
@@ -444,12 +442,12 @@ function OptionRow({
               : ""}
           </span>
           {recommended && (
-            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-sky-800">
+            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-[#173f63]">
               recommended
             </span>
           )}
           {rivals.length > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-pending-soft px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+            <span className="flex items-center gap-1 rounded-full bg-pending-soft px-2 py-0.5 text-[11px] font-semibold text-amber-800">
               <Swords size={10} /> wanted by {rivals.length}
             </span>
           )}
@@ -532,7 +530,7 @@ export function SeatWorkspace({
     const special = chosen === CANCEL || chosen === SHORT;
     return (
       <div className="flex flex-col gap-3">
-        <p className="rounded-xl bg-critical-soft px-3 py-2 text-sm text-red-900">
+        <p className="rounded-md bg-critical-soft px-3 py-2 text-sm text-red-900">
           {seat.status === "already_started"
             ? "This trip has already started; it can no longer be re-crewed."
             : seat.status === "cancelled"
@@ -586,34 +584,34 @@ export function SeatWorkspace({
   return (
     <div className="flex flex-col gap-4">
       {!coverable && (
-        <p className="rounded-xl bg-pending-soft px-3 py-2 text-sm text-amber-900">
+        <p className="rounded-md bg-pending-soft px-3 py-2 text-sm text-amber-900">
           The analysis found no legal cover here, but the roster or rules have changed since. These options are shown
           for information; re-run the analysis to plan with them.
         </p>
       )}
       {coverable && !recommendedListed && (
-        <p className="rounded-xl bg-pending-soft px-3 py-2 text-sm text-amber-900">
+        <p className="rounded-md bg-pending-soft px-3 py-2 text-sm text-amber-900">
           The joint plan&apos;s pick <Mono>{recommendedId}</Mono> is not in the current option list. Submitting the
           recommendation re-checks it; or choose another option below.
         </p>
       )}
       {suggestions.length > 0 && (
-        <section className="animate-rise rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
+        <section className="rounded-lg border border-[#cfe0ef] bg-accent-soft/60 p-4">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-[#173f63]">
             <Lightbulb size={15} /> Suggested by other desks
           </h3>
           <ul className="mt-2 flex flex-col gap-1.5 text-sm">
             {suggestions.map((sg) => (
               <li key={`${sg.by}-${sg.at}`} className="flex flex-wrap items-center gap-2">
                 <b>{sg.name ?? sg.crew_id}</b> <Mono className="text-xs">{sg.crew_id}</Mono>
-                <span className="text-xs text-indigo-900/70">
+                <span className="text-xs text-[#173f63]">
                   from {sg.by} ({sg.desk}){sg.note ? `: “${sg.note}”` : ""}
                 </span>
                 {onChoose && live?.options.some((o) => o.crew_id === sg.crew_id) && (
                   <button
                     type="button"
                     onClick={() => onChoose(sg.crew_id)}
-                    className="ml-auto rounded-md bg-white px-2 py-0.5 text-xs font-medium text-indigo-800 ring-1 ring-indigo-200 hover:bg-indigo-100"
+                    className="ml-auto rounded-md bg-white px-2 py-0.5 text-xs font-medium text-[#173f63] ring-1 ring-[#cfe0ef] hover:bg-accent-soft"
                   >
                     Use this
                   </button>
@@ -649,7 +647,7 @@ export function SeatWorkspace({
                 disabled={!onChoose}
                 onClick={() => o.crew_id && onChoose?.(o.crew_id)}
                 className={cx(
-                  "lift rounded-2xl border p-4 text-left disabled:cursor-default",
+                  "lift rounded-lg border p-4 text-left disabled:cursor-default",
                   active ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200" : "border-line bg-surface",
                 )}
                 title={hint}
@@ -661,7 +659,7 @@ export function SeatWorkspace({
                   {active && <Check size={15} className="text-emerald-600" />}
                 </span>
                 <span className="mt-2 block font-medium">
-                  {o.name} <Mono className="text-xs text-sky-700">{o.crew_id}</Mono>
+                  {o.name} <Mono className="text-xs text-[#173f63]">{o.crew_id}</Mono>
                 </span>
                 <span className="block text-xs text-muted">{STRATEGY[o.strategy] ?? o.strategy}</span>
                 <dl className="mt-3 grid grid-cols-[1fr_auto] gap-y-1 text-xs">
@@ -684,7 +682,7 @@ export function SeatWorkspace({
         <Narrative seat={seat} option={selected} />
       )}
 
-      <section className="rounded-2xl border border-line bg-surface p-4">
+      <section className="rounded-lg border border-line bg-surface p-4">
         <h3 className="mb-3 flex items-center gap-2 font-semibold">
           <Gauge size={16} className="text-accent" /> All legal options <Info term="legal" />
           <span className="text-xs font-normal text-muted">
@@ -738,7 +736,7 @@ export function SeatWorkspace({
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
-                className="w-full rounded-xl border border-dashed border-line py-2 text-xs font-medium text-accent hover:bg-accent-soft"
+                className="w-full rounded-md border border-dashed border-line py-2 text-xs font-medium text-accent hover:bg-accent-soft"
               >
                 {showAll ? `Show the top ${MAX_SHOWN}` : `Show all ${live.options.length} legal options`}
               </button>
@@ -749,11 +747,11 @@ export function SeatWorkspace({
             .map((o) => (
               <li
                 key={`gone-${o.crew_id}`}
-                className="flex flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-critical-soft/50 px-3 py-2 text-sm"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-critical-soft/50 px-3 py-2 text-sm"
               >
                 <span className="font-medium text-red-800 line-through">{o.name}</span>
                 <Mono className="text-xs text-red-800 line-through">{o.crew_id}</Mono>
-                <span className="rounded-full bg-critical px-2 py-0.5 text-[10px] font-semibold text-white">
+                <span className="rounded-full bg-critical px-2 py-0.5 text-[11px] font-semibold text-white">
                   was option {o.rank}; reported {unavailable[o.crew_id!].reason ?? "unavailable"}{" "}
                   {day(unavailable[o.crew_id!].reported_utc)} {clock(unavailable[o.crew_id!].reported_utc)}
                 </span>
@@ -797,7 +795,7 @@ export function SeatWorkspace({
             <ChevronDown size={15} className={cx("text-muted transition", showExcluded && "rotate-180")} />
           </button>
           {showExcluded && (
-            <div className="animate-rise mt-3 flex flex-col gap-3">
+            <div className="mt-3 flex flex-col gap-3">
               <p className="text-xs text-muted">Considered and rejected, so it is clear nobody was overlooked.</p>
               <ol className="flex flex-wrap items-center gap-1.5 text-[11px]">
                 {live.funnel.map((f, i) => (
@@ -820,14 +818,14 @@ export function SeatWorkspace({
                         {(e.rule_ids ?? []).map((r) => (
                           <Mono
                             key={r}
-                            className="rounded-full border border-red-200 px-2 py-0.5 text-[10px] text-red-700"
+                            className="rounded-full border border-red-200 px-2 py-0.5 text-[11px] text-red-700"
                           >
                             ✕ {r}
                           </Mono>
                         ))}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600">{(e.reasons ?? []).join("; ")}</p>
+                    <p className="text-xs text-muted">{(e.reasons ?? []).join("; ")}</p>
                   </li>
                 ))}
               </ul>

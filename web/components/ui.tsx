@@ -12,17 +12,17 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: Tone }) {
   const tones: Record<Tone, string> = {
-    primary: "bg-brand text-brand-ink shadow-sm hover:bg-[#123259]",
-    accent: "bg-accent text-white shadow-sm hover:bg-sky-700",
-    secondary: "bg-surface text-foreground border border-line hover:border-sky-300 hover:bg-sunken",
-    danger: "bg-critical text-white shadow-sm hover:bg-red-700",
+    primary: "bg-brand text-brand-ink hover:bg-[#2a2c2f]",
+    accent: "bg-accent text-white hover:bg-[#184d7d]",
+    secondary: "bg-surface text-foreground border border-control hover:bg-sunken",
+    danger: "bg-critical text-white hover:bg-[#a51e23]",
     ghost: "text-muted hover:text-foreground hover:bg-sunken",
   };
   return (
     <button
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium",
-        "transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex min-h-8 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium",
+        "transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         tones[tone],
         className,
@@ -48,33 +48,23 @@ export function Panel({
   bodyClassName?: string;
 }) {
   return (
-    <section
-      className={cx(
-        "flex min-h-0 flex-col rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgb(15_23_42/0.04)]",
-        "animate-rise",
-        className,
-      )}
-    >
+    <section className={cx("flex min-h-0 flex-col rounded-lg border border-line bg-surface", className)}>
       {title && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+        <header className="flex min-h-12 items-center justify-between gap-3 border-b border-rule px-5 py-2.5">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-foreground [&_svg]:text-muted">
             {icon}
             {title}
           </h2>
           {action}
         </header>
       )}
-      <div className={cx("min-h-0 flex-1 p-4", bodyClassName)}>{children}</div>
+      <div className={cx("min-h-0 flex-1 p-5", bodyClassName)}>{children}</div>
     </section>
   );
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <section className={cx("animate-rise rounded-2xl border border-line bg-surface p-5 shadow-sm", className)}>
-      {children}
-    </section>
-  );
+  return <section className={cx("rounded-lg border border-line bg-surface p-5", className)}>{children}</section>;
 }
 
 export function Field({
@@ -84,9 +74,9 @@ export function Field({
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
+      <span className="font-medium text-foreground">{label}</span>
       <input
-        className="rounded-lg border border-line bg-surface px-3 py-2 outline-none transition focus:border-accent focus:ring-4 focus:ring-sky-100"
+        className="h-10 rounded-md border border-control bg-surface px-3 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
         {...props}
       />
       {hint && <span className="text-xs text-muted">{hint}</span>}
@@ -94,38 +84,48 @@ export function Field({
   );
 }
 
+// Pale tint with dark ink of the same hue. Red only where someone must act now, amber where a
+// decision waits, green once it is done; everything settled is neutral.
+const NEGATIVE = "bg-critical-soft text-[#831c1e] ring-[#f5c2bd]";
+const WAITING = "bg-pending-soft text-[#92400e] ring-[#fde68a]";
+const READY = "bg-accent-soft text-[#173f63] ring-[#cfe0ef]";
+const DONE = "bg-ok-soft text-[#04250e] ring-[#b7e9c8]";
+const NEUTRAL = "bg-sunken text-[#353736] ring-line";
+const LABEL: Record<string, string> = { RESOLVING: "Awaiting sign-off", DECISION_NEEDED: "Decision needed" };
 const STATUS: Record<string, string> = {
-  REPORTED: "bg-critical-soft text-red-800 ring-red-200",
-  OPTIONS_READY: "bg-accent-soft text-sky-800 ring-sky-200",
-  TO_RESOLVE: "bg-ok-soft text-emerald-800 ring-emerald-200",
-  DECISION_NEEDED: "bg-pending-soft text-amber-800 ring-amber-200",
-  SUBMITTED: "bg-pending-soft text-amber-800 ring-amber-200",
-  COMMITTED: "bg-ok-soft text-emerald-800 ring-emerald-200",
-  CLOSED: "bg-slate-100 text-slate-700 ring-slate-200",
-  RECORDED: "bg-violet-50 text-violet-800 ring-violet-200",
-  REJECTED: "bg-critical-soft text-red-800 ring-red-200",
-  QUEUED: "bg-slate-100 text-slate-700 ring-slate-200",
-  WITHDRAWN: "bg-slate-100 text-slate-700 ring-slate-200",
-  STALE: "bg-orange-100 text-orange-800 ring-orange-200",
+  REPORTED: NEGATIVE,
+  OPTIONS_READY: READY,
+  TO_RESOLVE: READY,
+  DECISION_NEEDED: WAITING,
+  SUBMITTED: WAITING,
+  RESOLVING: WAITING,
+  COMMITTED: DONE,
+  CLOSED: NEUTRAL,
+  RECORDED: NEUTRAL,
+  REJECTED: NEGATIVE,
+  QUEUED: NEUTRAL,
+  WITHDRAWN: NEUTRAL,
+  STALE: WAITING,
+  REVOKED: NEUTRAL,
 };
 
 export function Status({ value }: { value: string }) {
   return (
     <span
       className={cx(
-        "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide ring-1 ring-inset",
-        STATUS[value] ?? "bg-slate-100 text-slate-700 ring-slate-200",
+        "inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+        STATUS[value] ?? NEUTRAL,
       )}
     >
-      {value.replace(/_/g, " ")}
+      {LABEL[value] ?? value.charAt(0) + value.slice(1).replace(/_/g, " ").toLowerCase()}
     </span>
   );
 }
 
 const SEVERITY = {
-  high: { label: "High", tone: "bg-red-600 text-white ring-red-600", dot: "bg-white" },
-  medium: { label: "Medium", tone: "bg-amber-100 text-amber-900 ring-amber-300", dot: "bg-amber-500" },
-  low: { label: "Low", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200", dot: "bg-emerald-500" },
+  high: { label: "High", tone: "bg-critical-soft text-[#831c1e] ring-[#f5c2bd]", dot: "bg-critical" },
+  medium: { label: "Medium", tone: "bg-pending-soft text-[#92400e] ring-[#fde68a]", dot: "bg-pending" },
+  low: { label: "Low", tone: "bg-sunken text-[#353736] ring-line", dot: "bg-[#8a8d90]" },
 } as const;
 
 /** How serious a disruption is (high, medium or low), with why on hover. */
@@ -138,7 +138,7 @@ export function SeverityBadge({ severity }: { severity?: { level: string; reason
     <span
       title={why ? `${s.label} severity: ${why}` : `${s.label} severity`}
       className={cx(
-        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset",
+        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset",
         s.tone,
       )}
     >
@@ -155,11 +155,11 @@ export function Mono({ children, className }: { children: ReactNode; className?:
 
 export function Notice({ tone = "info", children }: { tone?: "info" | "error" | "ok"; children: ReactNode }) {
   const tones = {
-    info: "border-sky-200 bg-accent-soft text-sky-900",
-    error: "border-red-200 bg-critical-soft text-red-900",
-    ok: "border-emerald-200 bg-ok-soft text-emerald-900",
+    info: "border-[#cfe0ef] bg-accent-soft text-[#173f63]",
+    error: "border-[#f5c2bd] bg-critical-soft text-[#831c1e]",
+    ok: "border-[#b7e9c8] bg-ok-soft text-[#04250e]",
   };
-  return <p className={cx("animate-rise rounded-lg border px-3 py-2 text-sm", tones[tone])}>{children}</p>;
+  return <p className={cx("rounded-md border px-3 py-2 text-sm", tones[tone])}>{children}</p>;
 }
 
 export function Spinner({ className }: { className?: string }) {
@@ -195,4 +195,22 @@ export function day(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+/** The day after an ISO date ("2026-10-31" -> "2026-11-01"); "" stays "". */
+export function nextDay(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** On a form's "from" field: its "until" field may not start before it (the same day, or
+ * the same moment for a time, is the earliest), so move its minimum and clear a value that no
+ * longer fits. Works for date and datetime-local inputs alike. */
+export function untilFrom(from: HTMLInputElement, untilName: string) {
+  const until = from.form?.elements.namedItem(untilName);
+  if (!(until instanceof HTMLInputElement) || !from.value) return;
+  until.min = from.value;
+  if (until.value && until.value < from.value) until.value = "";
 }

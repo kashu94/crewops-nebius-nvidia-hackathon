@@ -36,22 +36,22 @@ export function FourEyes({
       <span
         className={cx(
           "grid h-4 w-4 place-items-center rounded-full",
-          ok ? "bg-emerald-400 text-slate-950" : "bg-slate-700 text-slate-300",
+          ok ? "bg-emerald-400 text-foreground" : "bg-slate-700 text-slate-300",
         )}
       >
         {ok ? <Check size={10} strokeWidth={3} /> : <Hourglass size={9} />}
       </span>
-      <span className="w-20 shrink-0 text-slate-400">{label}</span>
+      <span className="w-20 shrink-0 text-muted">{label}</span>
       {value ? (
         <span title={value} className="break-all text-emerald-300">
           {value.slice(0, 16)}
           <span className="text-emerald-300/40">{value.slice(16, 24)}…</span>
         </span>
       ) : (
-        <span className="text-slate-500">awaiting a second person</span>
+        <span className="text-muted">awaiting a second person</span>
       )}
       {who && (
-        <span className="text-slate-400">
+        <span className="text-muted">
           · {who}
           {at && (
             <>
@@ -66,11 +66,11 @@ export function FourEyes({
   return (
     <div
       className={cx(
-        "rounded-xl bg-slate-950 px-3 py-2.5 font-mono text-[11px] leading-relaxed shadow-inner",
+        "rounded-md bg-slate-950 px-3 py-2.5 font-mono text-[11px] leading-relaxed shadow-inner",
         className,
       )}
     >
-      <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+      <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-muted">
         <Fingerprint size={12} className="text-emerald-400" /> Four-eyes record · SHA-256
       </p>
       {row("Submitted", fingerprint, true, submittedBy, submittedAt)}

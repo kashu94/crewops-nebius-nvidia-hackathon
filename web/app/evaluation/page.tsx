@@ -78,27 +78,19 @@ function Stat({
   label,
   value,
   sub,
-  tone = "sky",
 }: {
   icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
-  tone?: "sky" | "emerald" | "violet" | "amber";
 }) {
-  const tones = {
-    sky: "from-sky-50 text-sky-700",
-    emerald: "from-emerald-50 text-emerald-700",
-    violet: "from-violet-50 text-violet-700",
-    amber: "from-amber-50 text-amber-700",
-  };
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-gradient-to-br to-white p-4 ${tones[tone]}`}>
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]">
+    <div className="bg-surface px-5 py-4">
+      <p className="flex items-center gap-1.5 text-sm text-muted [&_svg]:hidden">
         {icon} {label}
       </p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-slate-500">{sub}</p>}
+      <p className="mt-1 text-[28px] font-normal leading-tight tabular-nums text-foreground">{value}</p>
+      {sub && <p className="mt-1 text-xs leading-snug text-muted">{sub}</p>}
     </div>
   );
 }
@@ -108,18 +100,19 @@ function Bar({ label, what, passed, total }: { label: string; what: string; pass
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="font-medium text-slate-800">{label}</span>
-        <span className="font-mono text-xs tabular-nums text-slate-500">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="text-xs tabular-nums text-muted">
           {passed}/{total} · {pct(passed, total)}
         </span>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+      {/* the pass share in the data hue; what falls short shows as the track */}
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e6e8ea]">
         <div
-          className={`h-full rounded-full ${share >= 0.95 ? "bg-emerald-500" : share >= 0.7 ? "bg-sky-500" : "bg-amber-500"}`}
+          className={`h-full rounded-full ${share >= 0.7 ? "bg-accent" : "bg-pending"}`}
           style={{ width: `${share * 100}%` }}
         />
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">{what}</p>
+      <p className="mt-1 text-xs text-muted">{what}</p>
     </div>
   );
 }
@@ -128,45 +121,43 @@ function Row({ r }: { r: Result }) {
   const [open, setOpen] = useState(false);
   const agreement = typeof r.checks.agreement === "number" ? (r.checks.agreement as number) : null;
   return (
-    <li className="border-b border-slate-100 last:border-0">
+    <li className="border-b border-rule last:border-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+        className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-sunken"
         aria-expanded={open}
       >
         {r.passed ? (
-          <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-500" />
+          <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-ok" />
         ) : (
-          <XCircle size={17} className="mt-0.5 shrink-0 text-amber-500" />
+          <XCircle size={17} className="mt-0.5 shrink-0 text-pending" />
         )}
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[11px] text-slate-400">{r.case_id}</span>
-            <span className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+            <span className="font-mono text-xs text-muted">{r.case_id}</span>
+            <span className="rounded bg-sunken px-1.5 text-xs font-medium text-[#353736]">
               {KINDS[r.kind]?.label ?? r.kind}
             </span>
-            {r.intent && (
-              <span className="text-[11px] text-slate-400">{r.intent.toLowerCase().replace(/_/g, " ")}</span>
-            )}
+            {r.intent && <span className="text-xs text-muted">{r.intent.toLowerCase().replace(/_/g, " ")}</span>}
           </span>
-          <span className="mt-0.5 block text-sm text-slate-800">{r.prompt}</span>
+          <span className="mt-0.5 block text-sm text-foreground">{r.prompt}</span>
         </span>
-        <span className="hidden shrink-0 text-right text-[11px] text-slate-500 sm:block">
+        <span className="hidden shrink-0 text-right text-xs text-muted sm:block">
           {agreement !== null && <span className="block">facts {Math.round(agreement * 100)}%</span>}
           <span className="block font-mono">
             {r.ms} ms{r.model_calls ? ` · ${r.model_calls} model` : ""}
           </span>
         </span>
-        <ChevronDown size={15} className={`mt-1 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={15} className={`mt-1 shrink-0 text-muted transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="space-y-2 px-11 pb-4 text-sm">
-          <p className="rounded-xl bg-slate-50 px-3 py-2 leading-relaxed text-slate-700">{r.answer || "(no answer)"}</p>
+          <p className="rounded-md bg-sunken px-3 py-2 leading-relaxed text-foreground">{r.answer || "(no answer)"}</p>
           <p className="flex flex-wrap gap-1.5">
-            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] text-sky-800">source: {r.source}</span>
+            <span className="rounded bg-accent-soft px-1.5 py-0.5 text-xs text-[#173f63]">source: {r.source}</span>
             {Object.entries(r.checks).map(([k, v]) => (
-              <span key={k} className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+              <span key={k} className="rounded-full bg-sunken px-2 py-0.5 font-mono text-xs text-muted">
                 {k}: {Array.isArray(v) ? `[${v.join(", ")}]` : String(v)}
               </span>
             ))}
@@ -219,9 +210,9 @@ export default function Evaluation() {
   if (!report) {
     return (
       <main className="mx-auto flex min-h-[100dvh] max-w-3xl flex-col items-center justify-center gap-3 px-4 text-center">
-        <FlaskConical size={28} className="text-sky-600" />
+        <FlaskConical size={28} className="text-accent" />
         <h1 className="text-xl font-semibold">Evaluation results</h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           {Object.keys(reports).length === 0 && mode === null
             ? "Loading, or no report published yet: run python -m crewops.agent.evaluate --json web/public/evals/offline.json."
             : "Loading…"}
@@ -239,98 +230,94 @@ export default function Evaluation() {
   const other = Object.keys(reports).find((m) => m !== mode);
 
   return (
-    <main className="min-h-[100dvh] bg-[radial-gradient(ellipse_at_top,#e0f2fe,transparent_55%),linear-gradient(#f8fafc,#f1f5f9)]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <main className="min-h-[100dvh] bg-background sm:p-2">
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-6 border-line bg-surface px-4 py-8 sm:rounded-lg sm:border sm:px-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">CrewOps · evaluation</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">How well CrewOps answers</h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            <p className="text-sm text-muted">CrewOps evaluation</p>
+            <h1 className="mt-0.5 text-[22px] font-semibold tracking-tight text-foreground">
+              How well CrewOps answers
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
               A held-out set written after the routing rules were final and never used to change them: every gold
               question reworded, plus behaviour cases. Scoring is deterministic; no model judges another.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {Object.keys(reports).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                  m === mode
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                {m === "offline" ? "Rules and templates" : "Live (NVIDIA Nemotron on Nebius)"}
-              </button>
-            ))}
-          </div>
+          {/* A choice only when both runs exist; with one, a plain label says which it is. */}
+          {Object.keys(reports).length < 2 ? (
+            <p className="rounded-md bg-sunken px-3 py-1.5 text-sm text-muted">
+              {mode === "offline" ? "Rules and templates (offline run)" : "Live run (NVIDIA Nemotron on Nebius)"}
+            </p>
+          ) : (
+            <div className="flex items-center gap-2" role="group" aria-label="Which run">
+              {Object.keys(reports).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`h-8 rounded-md px-3 text-sm font-medium transition-colors ${
+                    m === mode
+                      ? "bg-brand text-white"
+                      : "bg-surface text-foreground ring-1 ring-control hover:bg-sunken"
+                  }`}
+                >
+                  {m === "offline" ? "Rules and templates" : "Live (NVIDIA Nemotron on Nebius)"}
+                </button>
+              ))}
+            </div>
+          )}
         </header>
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
           <Stat
             icon={<ShieldCheck size={13} />}
             label="Unsourced claims"
             value={s.unsourced_answers}
-            tone="emerald"
             sub={`of ${answered} answers, re-verified against their own tool results`}
           />
           <Stat
             icon={<Lock size={13} />}
             label="Personal data leaks"
             value={s.personal_data_leaks}
-            tone="emerald"
             sub="answers that needed personal data removed"
           />
           <Stat
             icon={<Route size={13} />}
             label="Routing"
             value={pct(routed, routable)}
-            tone="sky"
             sub={`${s.routing} rewordings reach the gold question's intent`}
           />
           <Stat
             icon={<BadgeCheck size={13} />}
             label="Fact agreement"
             value={`${Math.round(s.fact_agreement_mean * 100)}%`}
-            tone="sky"
             sub="mean share of the gold answer's ids, times and figures stated"
           />
           <Stat
             icon={<CheckCircle2 size={13} />}
             label="Behaviour cases"
             value={`${behaviourPassed}/${behaviourTotal}`}
-            tone="violet"
             sub="off-topic, roles, questions back, follow-ups, injection"
           />
           <Stat
             icon={<Clock3 size={13} />}
             label="Latency"
             value={s.ms_p50 < 1 ? "under 1 ms" : `${s.ms_p50} ms`}
-            tone="amber"
             sub={`median; 95th percentile ${s.ms_p95} ms`}
           />
           <Stat
             icon={<Bot size={13} />}
             label="Model calls"
             value={s.model_calls}
-            tone="amber"
             sub={s.model_calls ? `${s.tokens.toLocaleString("en-IN")} tokens in all` : "rules and templates only"}
           />
-          <Stat
-            icon={<Gauge size={13} />}
-            label="Questions"
-            value={s.questions}
-            tone="violet"
-            sub={`mode: ${s.mode}`}
-          />
+          <Stat icon={<Gauge size={13} />} label="Questions" value={s.questions} sub={`mode: ${s.mode}`} />
         </section>
 
         {other && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              {mode} compared with {other}
+          <section className="rounded-lg border border-line bg-surface p-5">
+            <h2 className="text-[15px] font-semibold text-foreground">
+              {mode === "live" ? "Live" : "Offline"} compared with {other}
             </h2>
             <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
               {(
@@ -344,10 +331,10 @@ export default function Evaluation() {
                   ["Median latency", `${s.ms_p50} ms`, `${reports[other].summary.ms_p50} ms`],
                 ] as const
               ).map(([label, here, there]) => (
-                <p key={label} className="rounded-xl bg-slate-50 px-3 py-2">
-                  <span className="block text-[11px] text-slate-500">{label}</span>
-                  <span className="font-semibold text-slate-900">{here}</span>
-                  <span className="text-slate-400"> vs {there}</span>
+                <p key={label} className="rounded-md bg-sunken px-3 py-2">
+                  <span className="block text-xs text-muted">{label}</span>
+                  <span className="font-semibold tabular-nums text-foreground">{here}</span>
+                  <span className="tabular-nums text-muted"> vs {there}</span>
                 </p>
               ))}
             </div>
@@ -355,14 +342,14 @@ export default function Evaluation() {
         )}
 
         <section className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">By kind</h2>
+          <div className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-5">
+            <h2 className="text-[15px] font-semibold text-foreground">By kind</h2>
             {Object.entries(s.passed).map(([k, v]) => {
               const [a, b] = ratio(v);
               return <Bar key={k} label={KINDS[k]?.label ?? k} what={KINDS[k]?.what ?? ""} passed={a} total={b} />;
             })}
-            <div className="mt-1 rounded-xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
-              <p className="font-semibold text-slate-700">How it is scored</p>A rewording passes when its answer states
+            <div className="mt-1 rounded-md bg-sunken p-3 text-xs leading-relaxed text-muted">
+              <p className="font-semibold text-foreground">How it is scored</p>A rewording passes when its answer states
               at least 80% of the gold answer&apos;s facts (ids, times, figures), or when the gold question gets no
               factual answer and the rewording reaches the same intent. Every answer is verified again here against its
               own tool results. Rewordings the rules miss are what the semantic search and Nemotron are for: the live run
@@ -370,18 +357,18 @@ export default function Evaluation() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
+          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
               <label className="relative min-w-[200px] flex-1">
                 <Search
                   size={13}
-                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
                 />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search questions and answers"
-                  className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-8 text-sm outline-none focus:border-sky-400"
+                  className="w-full rounded-lg border border-line py-1.5 pl-8 pr-8 text-sm outline-none focus:border-accent"
                 />
                 {query && (
                   <button
@@ -389,7 +376,7 @@ export default function Evaluation() {
                     onClick={() => setQuery("")}
                     aria-label="Clear the search"
                     title="Clear"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:bg-sunken hover:text-foreground"
                   >
                     <X size={13} />
                   </button>
@@ -398,7 +385,7 @@ export default function Evaluation() {
               <select
                 value={kind}
                 onChange={(e) => setKind(e.target.value)}
-                className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                className="rounded-lg border border-line px-2 py-1.5 text-sm"
                 aria-label="Kind"
               >
                 <option value="all">All kinds</option>
@@ -408,11 +395,11 @@ export default function Evaluation() {
                   </option>
                 ))}
               </select>
-              <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <label className="flex items-center gap-1.5 text-xs text-muted">
                 <input type="checkbox" checked={onlyFailed} onChange={(e) => setOnlyFailed(e.target.checked)} />
                 Only misses
               </label>
-              <span className="ml-auto text-xs text-slate-400">{shown.length} shown</span>
+              <span className="ml-auto text-xs text-muted">{shown.length} shown</span>
             </div>
             <ol className="max-h-[70vh] overflow-y-auto">
               {shown.map((r) => (
@@ -422,11 +409,9 @@ export default function Evaluation() {
           </div>
         </section>
 
-        <p className="text-center text-[11px] text-slate-500">
-          Synthetic crew data. Reproduce with{" "}
-          <code className="rounded bg-white px-1 py-0.5 ring-1 ring-slate-200">python -m crewops.agent.evaluate</code>{" "}
-          (offline, free) or <code className="rounded bg-white px-1 py-0.5 ring-1 ring-slate-200">--live</code>.{" "}
-          <Link href="/login" className="text-sky-700 hover:underline">
+        <p className="text-center text-xs text-muted">
+          All crew, flights and airlines here are synthetic, made up for this demonstration.{" "}
+          <Link href="/login" className="text-accent hover:underline">
             Sign in to CrewOps
           </Link>
         </p>

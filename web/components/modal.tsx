@@ -31,11 +31,11 @@ export function Modal({
   }, [onClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/35 p-4 backdrop-blur-md" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-brand/35 p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal
-        className={`animate-rise flex max-h-[85vh] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ${
+        className={`flex max-h-[85vh] w-full flex-col overflow-hidden rounded-lg bg-white shadow-2xl ${
           wide ? "max-w-2xl" : "max-w-lg"
         }`}
         onClick={(e) => e.stopPropagation()}

@@ -3,8 +3,9 @@
 import { BellRing, CalendarRange, Gauge, History, Mail, Save, ScrollText, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { AdminDuties, Passwords, RevokeReports } from "@/components/admin-duties";
 import { useMe } from "@/components/me";
-import { Button, clock, cx, day, Empty, Field, Mono, Notice, Panel, Spinner, Status } from "@/components/ui";
+import { Button, clock, cx, day, Empty, Field, Mono, Notice, Panel, Spinner, Status, untilFrom } from "@/components/ui";
 import { tool } from "@/lib/client";
 import { shownStatus } from "@/lib/types";
 
@@ -100,6 +101,9 @@ function ThresholdRow({
   const relaxing = t.stricter === "lower" ? value > t.value : value < t.value;
   const blocked = relaxing && !mayRelax;
   const regulatory = t.stricter === "lower" ? t.max : t.min;
+  // An admin may only tighten: the slider stops at today's value on the loose side.
+  const low = !mayRelax && t.stricter === "higher" ? t.value : t.min;
+  const high = !mayRelax && t.stricter === "lower" ? t.value : t.max;
 
   async function save() {
     setBusy(true);
@@ -119,15 +123,13 @@ function ThresholdRow({
   }
 
   return (
-    <li className="rounded-xl border border-line p-4 transition hover:border-sky-200">
+    <li className="rounded-lg border border-line p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">{t.label}</p>
           <Mono className="text-[11px] text-muted">{t.rule_id}</Mono>
         </div>
-        <span
-          className={cx("font-mono text-2xl font-semibold tabular-nums", changed ? "text-accent" : "text-slate-900")}
-        >
+        <span className={cx("text-2xl font-normal tabular-nums", changed ? "text-accent" : "text-foreground")}>
           {value}
           <span className="text-sm text-muted">{t.unit}</span>
         </span>
@@ -135,8 +137,8 @@ function ThresholdRow({
       <div className="relative mt-3">
         <input
           type="range"
-          min={t.min}
-          max={t.max}
+          min={low}
+          max={high}
           step={t.step}
           value={value}
           onChange={(e) => setValue(Number(e.target.value))}
@@ -145,39 +147,37 @@ function ThresholdRow({
         />
         <div className="mt-1 flex justify-between text-[11px] text-muted">
           <span>
-            {t.min}
+            {low}
             {t.unit}
-            {t.stricter === "lower" && " · strictest"}
-            {t.stricter === "higher" && " · regulatory"}
+            {low !== t.min ? " · now" : t.stricter === "lower" ? " · strictest" : " · regulatory"}
           </span>
           <span>
-            {t.max}
+            {high}
             {t.unit}
-            {t.stricter === "lower" && " · regulatory"}
-            {t.stricter === "higher" && " · strictest"}
+            {high !== t.max ? " · now" : t.stricter === "lower" ? " · regulatory" : " · strictest"}
           </span>
         </div>
       </div>
       {t.text && <p className="mt-2 text-xs text-muted">{t.text}</p>}
       {changed && (
-        <div className="animate-rise mt-3 flex flex-col gap-2 rounded-lg bg-accent-soft/60 p-3 sm:flex-row">
+        <div className="mt-3 flex flex-col gap-2 rounded-md bg-sunken p-3 sm:flex-row">
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={300}
             placeholder={`Why ${t.label.toLowerCase()} changes from ${t.value}${t.unit}`}
-            className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+            className="min-w-0 flex-1 rounded-md border border-control bg-white px-3 py-1.5 text-sm outline-none focus:border-accent"
           />
           <Button tone="accent" disabled={busy || !reason.trim() || blocked} onClick={save}>
             {busy ? <Spinner /> : <Save size={14} />} Save
           </Button>
           <Button tone="ghost" onClick={() => setValue(t.value)}>
-            Undo
+            Cancel
           </Button>
         </div>
       )}
       {blocked && (
-        <p className="mt-2 text-[11px] text-amber-800">
+        <p className="mt-2 text-xs text-[#92400e]">
           This relaxes the rule. Only a super admin may relax a threshold; an admin may only tighten it.
         </p>
       )}
@@ -193,6 +193,8 @@ function ThresholdRow({
 
 function describeEvent(e: Event): string {
   if (e.action === "RULE_CHANGED") return `${e.rule_id} ${e.param?.replace(/_/g, " ")} ${e.from} → ${e.to}`;
+  if (e.action === "PASSWORD_RESET") return `Password reset: ${e.reason?.replace(/^password reset for /, "") ?? ""}`;
+  if (e.action === "REVOKED") return `Report revoked ${e.disruption_id ?? ""}${e.reason ? `: ${e.reason}` : ""}`;
   if (e.action === "BLOCKED_PROMPT") return `Security: question refused (${e.reason ?? "override attempt"})`;
   if (e.action.startsWith("ALERT"))
     return `${e.action === "ALERT_ADDED" ? "Alert address added" : "Alert address removed"} (${e.role})`;
@@ -248,11 +250,17 @@ export default function Admin() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Administration</h1>
         <p className="text-sm text-muted">
-          Rule thresholds, system activity, alert addresses and planned leave. Plan decisions stay with controllers and
-          approvers.
+          Revoking reports filed in error, passwords, rule thresholds, system activity, alert addresses and planned
+          leave. Plan decisions stay with controllers and approvers.
         </p>
       </div>
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
+
+      <AdminDuties superAdmin={me.roles.includes("super_admin")} />
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+        <RevokeReports onChange={load} />
+        <Passwords onChange={load} />
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Panel
@@ -348,7 +356,7 @@ export default function Admin() {
         >
           <Field label="Email address" name="email" type="email" required maxLength={254} />
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">Role</span>
+            <span className="font-medium text-foreground">Role</span>
             <select name="role" className="rounded-lg border border-line bg-surface px-3 py-2">
               <optgroup label="Crew control">
                 <option value="controller">Controller</option>
@@ -372,11 +380,11 @@ export default function Admin() {
           One role per address; it receives alerts once it confirms AWS&apos;s email. At most five new addresses a day.
         </p>
         {addresses && addresses.length > 0 && (
-          <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
+          <ul className="mt-4 divide-y divide-line rounded-md border border-line">
             {addresses.map((a) => (
               <li key={a.subscription_id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
                 <span className="min-w-0 flex-1 truncate">{a.email}</span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs capitalize">
+                <span className="rounded-full bg-sunken px-2 py-0.5 text-xs capitalize">
                   {a.role.replace(/_/g, " ")}
                 </span>
                 <span className="text-xs text-muted">{a.status}</span>
@@ -431,13 +439,13 @@ export default function Admin() {
             }}
           >
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Crew member</span>
+              <span className="font-medium text-foreground">Crew member</span>
               <input
                 name="crew"
                 list="leave-crew"
                 required
                 placeholder="C-1042"
-                className="rounded-lg border border-line bg-surface px-3 py-2 outline-none focus:border-accent focus:ring-4 focus:ring-sky-100"
+                className="rounded-lg border border-line bg-surface px-3 py-2 outline-none focus:border-accent focus:ring-4 focus:ring-[#cfe0ef]"
               />
               <datalist id="leave-crew">
                 {leaveRef.crew.map((c) => (
@@ -454,6 +462,7 @@ export default function Admin() {
               required
               min={plusDays(leaveRef.today, 1)}
               max={leaveRef.leave_until ?? undefined}
+              onChange={(e) => untilFrom(e.currentTarget, "to")}
             />
             <Field
               label="Until"
@@ -463,7 +472,7 @@ export default function Admin() {
               max={leaveRef.leave_until ?? undefined}
             />
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-slate-700">Reason</span>
+              <span className="font-medium text-foreground">Reason</span>
               <select
                 name="reason"
                 className="rounded-lg border border-line bg-surface px-3 py-2 outline-none focus:border-accent"
@@ -478,6 +487,7 @@ export default function Admin() {
             <Button type="submit" tone="accent" disabled={busy}>
               {busy ? <Spinner /> : <CalendarRange size={14} />} Book leave
             </Button>
+            <p className="text-xs text-muted sm:col-span-5">Leave &quot;Until&quot; empty for a single day.</p>
           </form>
         )}
         <div className="mt-4">
@@ -488,7 +498,7 @@ export default function Admin() {
           ) : (
             <ul className="flex flex-col gap-2">
               {leave.map((l) => (
-                <li key={l.disruption_id} className="rounded-xl border border-line px-3 py-2 text-sm">
+                <li key={l.disruption_id} className="rounded-md border border-line px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">
                       <Mono>{l.details.crew_id}</Mono> · {day(l.details.from_date)} – {day(l.details.to_date)} ·{" "}
