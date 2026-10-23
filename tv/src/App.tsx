@@ -38,6 +38,11 @@ function coverRows(cover: { airline: string; base: string; rank: string; on_call
   return [...rows.values()];
 }
 
+/** The opened disruption as the board now shows it; null once it is no longer on it. */
+export function openedCard(cards: Card[] | undefined, id: string | null): Card | null {
+  return id ? ((cards ?? []).find((c) => c.disruption_id === id) ?? null) : null;
+}
+
 function useNow(): number {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -49,23 +54,28 @@ function useNow(): number {
 
 export const App = () => {
   const { board, error, updatedAt } = useBoard();
-  const [open, setOpen] = useState<Card | null>(null);
+  // The disruption opened with OK, by id: the panel always shows the latest board's copy,
+  // and closes once the disruption has left the board (resolved, closed).
+  const [openId, setOpenId] = useState<string | null>(null);
   // OK on a desk on the left shows only that desk's disruptions.
   const [deskFilter, setDeskFilter] = useState<string | null>(null);
   const now = useNow();
   const s = useScale();
 
+  const open = openedCard(board?.disruptions, openId);
+  const isOpen = open !== null;
+
   // The remote's back button closes an open disruption before it leaves the app.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (open) {
-        setOpen(null);
+      if (isOpen) {
+        setOpenId(null);
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [open]);
+  }, [isOpen]);
 
   const chosen = board?.desks.find((d) => d.desk_id === deskFilter) ?? null;
   const shown = (board?.disruptions ?? []).filter((c) => !deskFilter || c.desk?.desk_id === deskFilter);
@@ -230,7 +240,7 @@ export const App = () => {
                 <ScrollView style={{ flex: 1 }}>
                   <TVFocusGuideView autoFocus style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                     {shown.map((card, i) => (
-                      <DisruptionCard key={card.disruption_id} card={card} first={i === 0 && !open} onPress={() => setOpen(card)} />
+                      <DisruptionCard key={card.disruption_id} card={card} first={i === 0 && !open} onPress={() => setOpenId(card.disruption_id)} />
                     ))}
                   </TVFocusGuideView>
                 </ScrollView>
@@ -290,7 +300,7 @@ export const App = () => {
         </>
       )}
 
-      {open && <DetailPanel card={open} onClose={() => setOpen(null)} />}
+      {open && <DetailPanel card={open} onClose={() => setOpenId(null)} />}
     </View>
   );
 };

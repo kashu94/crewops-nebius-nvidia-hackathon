@@ -2,6 +2,7 @@
   "name": "@amazon-devices/crewopstv",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "files": ["dist"],
   "scripts": {
     "clean": "rm -rf node_modules buildinfo.json dist build",

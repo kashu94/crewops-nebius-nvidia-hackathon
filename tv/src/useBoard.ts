@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { BOARD_URL, PAIRING_CODE, REFRESH_MS } from './config';
+import { BOARD_URL, PAIRING_CODE, READ_TIMEOUT_MS, REFRESH_MS } from './config';
 import type { Board } from './types';
 
 export type BoardState = {
@@ -19,9 +19,13 @@ export function useBoard(): BoardState {
   const read = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
+    // A request that never answers would otherwise hold inFlight and stop every later read.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), READ_TIMEOUT_MS);
     try {
       const response = await fetch(BOARD_URL, {
         headers: PAIRING_CODE ? { 'x-crewops-pairing': PAIRING_CODE } : {},
+        signal: abort.signal,
       });
       const data = (await response.json()) as { result?: Board; error?: string };
       if (!response.ok || !data.result) {
@@ -29,9 +33,14 @@ export function useBoard(): BoardState {
       }
       setState({ board: data.result, error: null, updatedAt: Date.now() });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'CrewOps is unreachable';
+      const message = abort.signal.aborted
+        ? 'CrewOps did not answer in time'
+        : err instanceof Error
+          ? err.message
+          : 'CrewOps is unreachable';
       setState((s) => ({ ...s, error: message }));
     } finally {
+      clearTimeout(timer);
       inFlight.current = false;
     }
   }, []);
