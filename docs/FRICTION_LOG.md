@@ -3,17 +3,18 @@
 Problems hit while building CrewOps, across the whole stack, each written when it happened
 with the real error text. Entries are grouped by where the problem was:
 
-1. Amazon ecosystem: Alexa, Amazon Bedrock and Nova, AgentCore, and the Model Context
-   Protocol (MCP) server and SDK.
+0. Nebius Token Factory and NVIDIA Nemotron: the model layer.
+1. Amazon ecosystem: Alexa, Amazon Bedrock and Nova, AgentCore, the Model Context
+   Protocol (MCP) server and SDK, the Vega SDK for Fire TV, and Kiro.
 2. AWS backend infrastructure: accounts, CDK, Cognito, DynamoDB, SQS, SNS, AppSync,
-   Lambda, streams, the AWS SDK.
+   Lambda, streams, the AWS SDK, Amplify Hosting.
 3. Core software stack and local tooling: Python, uv, Node, moto and other test
    tooling.
 4. Our own code: every significant bug that tests, reviews, reference data or live runs
    found in what we wrote, and how it was fixed: the legality engine, the question pipeline,
    auth and plans, ingestion and search, the MCP server, evaluation, and the docs.
 
-Entry numbers run in the order the entries were written, across all four groups. Entries
+Entry numbers run in the order the entries were written, across all groups. Entries
 FL-020 onwards were written on 2026-10-08 from the build's full record (review reports,
 failing test output and live runs), for problems found and fixed since 2026-10-06.
 
@@ -34,7 +35,7 @@ would have done had it shipped, and High means a wrong answer, a security gap or
 - Expected:
 - Actual: (exact error text, screenshot in docs/friction/ if useful)
 - Workaround:
-- Suggestion: (for Amazon, or for the tool's maintainers)
+- Suggestion: (for the service's or the tool's maintainers)
 ```
 
 Entries in section 4 are about our own code, so they use a shorter form:
@@ -51,7 +52,29 @@ Entries in section 4 are about our own code, so they use a shorter form:
 - Fix:
 ```
 
-## 1. Amazon ecosystem (Alexa, Bedrock and Nova, AgentCore, MCP)
+## 0. Nebius Token Factory and NVIDIA Nemotron
+
+### FL-222: The Nemotron 70B model id and its tool-calling support are not in the public docs
+
+- Date: 2026-10-13
+- Service / tool: Nebius Token Factory documentation
+- Severity: Low
+- Task attempted: Point the three model roles at NVIDIA Llama-3.1-Nemotron-70B-Instruct on
+  Token Factory, with function calling for the advisor.
+- Steps taken: Read the Token Factory API reference and quickstart, and searched the docs
+  for the model.
+- Expected: The served model ids, and which of them accept `tools`, listed in the docs.
+- Actual: The API reference shows the base URL (`https://api.tokenfactory.nebius.com/v1/`)
+  and Llama example ids only; neither the Nemotron id nor per-model tool-calling support
+  could be confirmed without calling the API.
+- Workaround: The model ids are settings defaulting to
+  `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF`, and `python -m crewops.agent.nebius` lists
+  the key's catalogue (`GET /v1/models`) and says whether each configured model is served.
+  If the advisor's tool call is refused, the pipeline answers from the template.
+- Suggestion: A model catalogue page in the docs with each id, context length and whether
+  it supports function calling.
+
+## 1. Amazon ecosystem (Alexa, Bedrock and Nova, AgentCore, MCP, Vega, Kiro)
 
 ### FL-005: The MCP SDK's FastMCP runs plain-function tools on the event loop
 
@@ -383,6 +406,28 @@ Entries in section 4 are about our own code, so they use a shorter form:
 - Suggestion: Show the redirect URLs before the form (or on the skill's overview), and
   allow saving the switch without the provider details.
 
+### FL-242: Free-form questions fell through to the help reply on a phone
+
+- Date: 2026-10-22
+- Service / tool: Alexa Skills Kit (interaction model, `AMAZON.SearchQuery`), Alexa app on iOS
+- Severity: High (the skill's main use did not work by voice; about an hour)
+- Task attempted: Ask the linked skill questions from the Alexa app: "ask crew ops who
+  covers C 1042 on P 2291", "what's the FDP limit".
+- Steps taken: Opened the skill, asked questions inside the session and as one-shots.
+- Expected: The question passed to the skill's free-form intent.
+- Actual: Every question got the help reply; only the fixed "what's waiting" phrases
+  worked. A `SearchQuery` slot must follow carrier words ("tell me", "check"), and the model
+  only had those, so questions starting "who", "is" or "ask crew ops" matched nothing and
+  went to the fallback intent. The slot also never includes the carrier words, so one
+  intent with "who {question}" and "is {question}" can't tell which word was said. The
+  build reported no warning, and the console's simulator (FL-219) gave no way to see it.
+- Workaround: One intent per opening word ("who", "what's", "is", "am", ...), each with
+  only "<word> {question}", and the skill puts the word back before answering; plus
+  "ask crew ops {question}" for asking inside an open session. Hello and thanks get their
+  own intents.
+- Suggestion: A catch-all free-text slot that can stand alone, or return the matched
+  carrier words with the slot; and a build warning when every sample needs a carrier phrase.
+
 ### FL-221: The Vega project generator wrote into the repository root and replaced its .gitignore
 
 - Date: 2026-10-13
@@ -404,7 +449,104 @@ Entries in section 4 are about our own code, so they use a shorter form:
 - Suggestion: Create a folder named after the project unless told otherwise, and refuse
   (or ask) before writing into a non-empty directory or over an existing file.
 
-## 2. AWS backend infrastructure (accounts, CDK, Cognito, DynamoDB, SQS, SNS, AppSync, Lambda, SDK)
+### FL-222: Screenshots from the Vega Virtual Device came out empty
+
+- Date: 2026-10-13
+- Service / tool: Vega SDK 0.24, Vega Virtual Device, on Ubuntu 24.04 (Wayland)
+- Severity: Medium (each layout check needed a person to take the picture)
+- Task attempted: Check the Fire TV board's layout from a script while building it.
+- Steps taken: Took screenshots of the running app with the device's screenshot tooling, and
+  of the simulator window from the host.
+- Expected: An image of the board.
+- Actual: The device's screenshot tooling wrote empty files, and the Wayland desktop refused
+  capture of the simulator window from the host.
+- Workaround: The board was checked from screenshots taken by hand.
+- Suggestion: A `vega device screenshot` command that returns a PNG of the current frame
+  (the simulator has it), and a note on Wayland capture in the Linux setup page.
+
+### FL-223: Reaching a local web server from the Virtual Device needed a reverse port forward
+
+- Date: 2026-10-13
+- Service / tool: Vega CLI 1.4.4 (`vega device start-port-forwarding`)
+- Severity: Medium
+- Task attempted: Let the Fire TV app in the simulator read `http://localhost:3000` from the
+  web app running on the same laptop.
+- Steps taken: Pointed the app at `localhost:3000` and looked up port forwarding in the CLI.
+- Expected: The simulator's `localhost` reaches the host, or a forward whose direction is
+  named in the command.
+- Actual: Inside the simulator `localhost` is the device itself. The forward that reaches the
+  host is `start-port-forwarding --forward false`; the flag's name doesn't say which way the
+  traffic goes, and the forward has to be set again after every simulator start.
+- Workaround: `vega device start-port-forwarding --port 3000 --forward false` after each
+  start; the hosted app (https) avoids it.
+- Suggestion: Name the direction (`--to-host` / `--to-device`) and offer a setting that keeps
+  forwards across restarts.
+
+### FL-224: The Vega template shipped with stray diff markers and placeholder names
+
+- Date: 2026-10-13
+- Service / tool: Vega CLI 1.4.4 (`helloWorld` template)
+- Severity: Low
+- Task attempted: Start the Fire TV app from the template.
+- Steps taken: Generated the project and read its files.
+- Expected: Clean template files.
+- Actual: A comment in `metro.config.js` held leftover `+` diff markers with a broken
+  indent, and `manifest.toml`'s title read "Basic UI React Native Application for project
+  crewopstv", which the device shows as the app's name.
+- Workaround: Cleaned the comment and set the title by hand.
+- Suggestion: Fill the title from `--name`, and lint the template files before release.
+
+### FL-225: Kiro opened the folder in Restricted Mode and loaded no skill or MCP server
+
+- Date: 2026-10-13
+- Service / tool: Kiro (Linux), workspace skills and MCP servers
+- Severity: Medium
+- Task attempted: Load the CrewOps Agent Skill from `.kiro/skills/` and the remote MCP
+  server from `.kiro/settings/mcp.json` in a new folder.
+- Steps taken: Created both files and opened the folder with `kiro .`.
+- Expected: The workspace skill under Agent Steering & Skills, and "crewops" under MCP
+  Servers.
+- Actual: Only the three global skills were listed and the MCP panel was empty, with no
+  message saying why. A banner said the folder was in Restricted Mode. After trusting the
+  folder, still nothing appeared until Developer: Reload Window.
+- Workaround: Trust the folder, then reload the window.
+- Suggestion: Say in the Skills and MCP panels that workspace items are off in Restricted
+  Mode, and load them as soon as the folder is trusted.
+
+### FL-226: Kiro's MCP config expanded `${VAR}` only when Kiro was started from that terminal
+
+- Date: 2026-10-13
+- Service / tool: Kiro (Linux), remote MCP servers with `${VAR}` in `url` and `headers`
+- Severity: High (about two hours)
+- Task attempted: Connect Kiro to the CrewOps MCP server with the URL and a Cognito access
+  token taken from environment variables, so no secret is written into a file.
+- Steps taken: Exported `CREWOPS_MCP_URL` and `CREWOPS_ACCESS_TOKEN`, then opened Kiro.
+- Expected: The server connects, or an error naming the missing variables.
+- Actual: "crewops Connection Failed". The MCP log only said
+  `[crewops] Reset skipped, server has no connectable config`. Kiro had been started by the
+  desktop session, not by the terminal holding the variables, so both expanded to nothing.
+- Workaround: A script signs in and writes the URL and a fresh token into the folder's
+  `mcp.json` (outside the repository, readable only by its owner); Kiro reconnects when the
+  file changes.
+- Suggestion: Log which variables were empty or unapproved, and let a header value come
+  from a command (as some clients do) so a token can be fetched when needed.
+
+### FL-227: No way for Kiro to refresh a short-lived bearer token for a remote MCP server
+
+- Date: 2026-10-13
+- Service / tool: Kiro (Linux), remote MCP servers behind a JWT authorizer
+- Severity: Medium
+- Task attempted: Keep Kiro connected to the CrewOps server, which accepts Cognito access
+  tokens valid for one hour.
+- Steps taken: Put the token in the server's `Authorization` header.
+- Expected: A way to refresh it, or OAuth support for the server.
+- Actual: The token can only be a fixed header value in `mcp.json`. Once it expires, an
+  hour later, the connection has to be fixed by hand with a new token.
+- Workaround: Rerun the token script, then press Retry.
+- Suggestion: MCP authorization with refresh, or a header taken from a command run before
+  each connection.
+
+## 2. AWS backend infrastructure (accounts, CDK, Cognito, DynamoDB, SQS, SNS, AppSync, Lambda, SDK, Amplify)
 
 ### FL-001: Project account denies CDK outside its home region, with no hint why
 
@@ -796,6 +938,54 @@ Entries in section 4 are about our own code, so they use a shorter form:
   stay off. No layer to maintain.
 - Suggestion: A managed Lambda layer with the cryptography library, or a KMS operation for
   web push signing and encryption.
+
+### FL-228: Amplify's new-app wizard showed only a GitHub API docs link when the build file was missing
+
+- Date: 2026-10-13
+- Service / tool: AWS Amplify Hosting (console, new app from GitHub, monorepo)
+- Severity: Medium
+- Task attempted: Create an Amplify app for `web/` in a monorepo, using the repository's
+  `amplify.yml`.
+- Steps taken: New app, GitHub, the repository and branch, "My app is a monorepo" with `web`.
+- Expected: The build settings from `amplify.yml`, or a message that it wasn't found.
+- Actual: A red toast: `Not Found - https://docs.github.com/rest/repos/contents#get-repository-content`,
+  with the detected Next.js defaults underneath. The file existed on the pushed branch; the
+  message gave no file name, path or branch to check.
+- Workaround: Pasted the same build spec into "Edit YML file"; the repository copy is used
+  once Amplify reads it.
+- Suggestion: Say which file and branch it looked for, and fall back to defaults with a
+  plain warning.
+
+### FL-229: Amplify's Next.js support page stops at version 15
+
+- Date: 2026-10-13
+- Service / tool: AWS Amplify Hosting (SSR compute)
+- Severity: Low
+- Task attempted: Host the web app, built on Next.js 16.4.
+- Steps taken: Read "Amplify support for Next.js" before deploying.
+- Expected: Next.js 16 listed, or a statement on it.
+- Actual: The page says apps "up through Next.js 15" are supported. The 16.4 build deployed
+  and served every route, but that had to be found out by trying.
+- Workaround: None needed.
+- Suggestion: Keep the supported-versions list current, or say how new major versions are
+  handled.
+
+### FL-230: Server code on Amplify had no AWS credentials, so spoken alerts failed with a 502
+
+- Date: 2026-10-13
+- Service / tool: AWS Amplify Hosting (SSR compute), Amazon Polly
+- Severity: Medium
+- Task attempted: Speak desk-speaker alerts with Polly from a Next.js API route on Amplify.
+- Steps taken: Deployed the app; opened `/speaker` and played an alert.
+- Expected: Polly's voice, as on a laptop where the route uses the developer's AWS profile.
+- Actual: `api/speaker/speak` returned 502; the server had no credentials to call Polly. The
+  page fell back to the browser's voice. Separately, environment variables set in the
+  console are visible to the build only, not to the running server.
+- Workaround: An IAM compute role allowing `polly:SynthesizeSpeech`, attached under App
+  settings, IAM roles; and the build spec copies the `CREWOPS_*` variables into
+  `.env.production`.
+- Suggestion: Mention the compute role on the SSR quick-start page, and offer runtime
+  environment variables for SSR apps.
 
 ## 3. Core software stack and local tooling (Python, uv, Node, test tooling)
 
@@ -3063,3 +3253,135 @@ Entries in section 4 are about our own code, so they use a shorter form:
 - What went wrong: "The browser never calls AWS", but the live-events socket connects from
   the browser to AppSync with the ID token.
 - Fix: "The browser calls no AWS API except the live-events socket".
+
+#### Found in the last week (13-21 October)
+
+### FL-231: A trip already under way that lost its captain was rated low
+
+- Date: 2026-10-13
+- Where: severity
+- Found by: live run
+- Severity: High
+- What went wrong: A. Nair, captain of the two-day trip P-2291, reported out on its first
+  day after it had started. The disruption came out "Low: nothing to cover" while the rest
+  of the trip had no captain.
+- Cause: Seats on a started trip were left out of the rating, as if the trip were done.
+- Fix: A started trip with flights still to fly rates high ("P-2291 is under way without its
+  captain"); a test covers it.
+
+### FL-232: Crew asking about themselves were told their role had no access
+
+- Date: 2026-10-20
+- Where: question pipeline
+- Found by: live run
+- Severity: High
+- What went wrong: Signed in as crew, "what are my flights today" and "when am I not
+  available" answered "Your role doesn't give access to that information", and "am I legal
+  for p 22291" returned `check_legality: 'crew_id' is required`.
+- Cause: The routes were built for crew control, who look things up about anyone; most of
+  those lookups are refused for crew.
+- Fix: A crew member's questions about their own trips, absences, rank, base and standby are
+  answered from their own roster before routing; an unknown trip id says so and names their
+  next trip.
+
+### FL-233: The reporting desk saw why crew were absent through the crew reports tab
+
+- Date: 2026-10-20
+- Where: MCP server, `my_reports`
+- Found by: review
+- Severity: High
+- What went wrong: A reporter calling `my_reports(scope="crew")` received each crew report's
+  reason (sick, fatigue) and free-text note, which the operations view hides from them.
+- Cause: The redaction was applied on the operations view only.
+- Fix: For callers without a reader role the reason and note are removed; a test covers it.
+
+### FL-234: Requests from the hosted site could be refused as "Bad origin"
+
+- Date: 2026-10-20
+- Where: web app, same-origin check
+- Found by: review
+- Severity: Medium
+- What went wrong: Behind a chain of proxies, or with the default port written out, the
+  check compared the whole `x-forwarded-host` header with the page's origin and refused
+  sign-in and every action with 403.
+- Cause: The first entry of a forwarded host list, and `host` itself, were never tried.
+- Fix: Either header may match the origin once normalised; another site still can't.
+
+### FL-235: A gate change could name a gate that doesn't exist, or the flight's own gate
+
+- Date: 2026-10-20
+- Where: report worker and report form
+- Found by: review and live run
+- Severity: Medium
+- What went wrong: Moves of DX401 to BLR-G9 (no such gate), HYD-G1 (another station) and
+  BLR-G4 (where it already boards) were accepted and analysed.
+- Fix: The worker and the server refuse all three; the form lists only other gates at the
+  flight's departure station.
+
+### FL-236: A roster upload that moved a flight to another gate left its old slot
+
+- Date: 2026-10-20
+- Where: roster upload
+- Found by: review
+- Severity: Medium
+- What went wrong: After moving DX403 from BLR-G1 to BLR-G6, the table held both slots, so
+  the flight seemed to hold two gates.
+- Cause: Slots are keyed by gate and time; validation merged by flight, the write did not.
+- Fix: Replaced slots stored under another key are deleted after an accepted upload.
+
+### FL-237: A reload started before an approval could bring back the old roster
+
+- Date: 2026-10-20
+- Where: MCP server cache
+- Found by: review
+- Severity: Medium
+- What went wrong: A background reload already reading the table finished after an approval
+  had cleared the cache, and served the pre-approval crew for up to a minute.
+- Fix: Clearing the cache bumps a generation number; a reload from an older generation is
+  thrown away.
+
+### FL-238: A fresh copy of `.env.example` made every command fail
+
+- Date: 2026-10-20
+- Where: configuration
+- Found by: review
+- Severity: Medium
+- What went wrong: `.env.example` set `CREWOPS_GUARDRAIL_VERSION=DRAFT`, which settings
+  refuse, so `ConfigError: CREWOPS_GUARDRAIL_VERSION must be a published version, not DRAFT`
+  came from every command. The file was also never in the repository: `.env.*` in
+  `.gitignore` caught it.
+- Fix: The value is empty by default, and `.gitignore` keeps `.env.example`.
+
+### FL-239: Resetting the team's passwords would have locked out the speaker and the TV
+
+- Date: 2026-10-20
+- Where: provisioning
+- Found by: review
+- Severity: Medium
+- What went wrong: `provision --apply --reset-passwords` gave every account, the speaker
+  device included, the team password; the hosted speaker page and the Fire TV board sign in
+  with the speaker's own password and would have stopped working.
+- Fix: The speaker keeps its own password unless it has none usable; a test covers it.
+
+### FL-240: The desktop-alerts bell stayed disabled after a dismissed permission prompt
+
+- Date: 2026-10-20
+- Where: web app, desktop alerts
+- Found by: live run
+- Severity: Medium
+- What went wrong: Closing the browser's notification prompt without answering turned the
+  bell grey and disabled it for good.
+- Cause: Any answer other than "granted" was treated as "blocked".
+- Fix: Only a real refusal blocks; a failed attempt shows its reason and can be retried.
+
+### FL-241: The Fire TV board fetched the site's home page instead of the board
+
+- Date: 2026-10-20
+- Where: Fire TV app
+- Found by: review
+- Severity: Medium
+- What went wrong: With the hosted address set as documented (the site's root), the TV
+  showed "Cannot reach CrewOps: JSON Parse error".
+- Fix: The app adds `/api/tv/board` when the path is missing; a read that never answers now
+  times out instead of freezing the board.
+

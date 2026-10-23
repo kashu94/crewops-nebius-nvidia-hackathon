@@ -74,19 +74,25 @@ and a time check before each model call, and its answer through the verifier.
 Fallback: the MCP server is stateless between requests, so it can move to Lambda behind a
 Function URL without code changes if AgentCore blocks progress.
 
-## D6. Models: Amazon Nova, chosen by evaluation
+## D6. Models: NVIDIA Nemotron on Nebius Token Factory
 
 The rules engine does the hard reasoning; the model only chooses tools and phrases answers,
-and the verifier rejects anything it did not get from a tool. That makes a small, fast model
-enough. Amazon Nova 2 Lite runs the advisor loop and the explainer; Amazon Nova Micro handles
-triage. Both are called through Bedrock's model-neutral Converse API, so every model is a
-setting, not code. Nova Micro runs in the deployment region; Nova 2 Lite is only offered
-through Bedrock's global cross-region profile.
+and the verifier rejects anything it did not get from a tool. NVIDIA
+Llama-3.1-Nemotron-70B-Instruct, served by Nebius Token Factory, runs all three roles:
+triage, the advisor's tool loop and the explainer. It is an open model tuned for helpful,
+instruction-following answers, and Token Factory serves it behind an OpenAI-compatible API
+with function calling, so no GPU of our own is needed.
 
-Traded away: some fluency. A smaller model chooses tools less reliably, so more answers
-fall back to the verified template wording. That is safe by construction, and the evaluation
-set measures how often it happens. Larger models or fine-tuning can be tried later by
-changing configuration and re-running the evaluation.
+The roles speak Bedrock Converse's message shapes (content blocks, tool use and tool
+results, stop reasons, usage). A small client (`crewops.agent.nebius`) translates them to
+chat completions, so the tool loop, stop-reason checks, breaker and fallbacks are
+independent of the provider, and every model is a setting, not code.
+
+Traded away: a second provider to run and pay for, and a network hop out of AWS on the voice
+path. Each role keeps its firm timeout and its template fallback, and Token Factory has its
+own breaker, so its outage costs fluency, never an answer. Other Token Factory models
+(a larger Nemotron for the advisor, a smaller one for triage) can be tried by changing
+configuration and re-running the evaluation.
 
 ## D7. Most answers need no model call to route
 
@@ -151,8 +157,9 @@ the lower-level CloudFormation constructs.
 The AWS account this runs in is a project in AWS's new account experience. AWS-managed
 policies pin each project to one home region and deny almost every service elsewhere.
 This project's home region is Asia Pacific (Sydney), and everything the system uses is
-available there: DynamoDB, SQS, SNS, Lambda, S3 Vectors, AgentCore and Bedrock with Nova and
-Titan. Model IDs were chosen so they also work unchanged in other regions.
+available there: DynamoDB, SQS, SNS, Lambda, S3 Vectors, AgentCore, and Bedrock with Titan
+embeddings and Guardrails. The chat models run on Nebius Token Factory, reached over HTTPS,
+so they do not depend on the AWS region.
 
 Not chosen: activating the account's advanced features to lift the region policy. It is
 irreversible and removes the spend limit, for no gain this project needs.
@@ -168,3 +175,18 @@ tools its caller may use.
 
 Traded away: a turn or two of back-and-forth when the user was vague. A wrong confident
 answer costs far more than one clarifying question.
+
+## D15. Inference on Nebius, everything else on AWS
+
+Only the language-model calls run on Nebius Token Factory. The operation (DynamoDB),
+search (S3 Vectors with Titan embeddings), safety screening (Bedrock Guardrails),
+conversation memory and hosting (AgentCore), sign-in (Cognito) and every event and alert
+path stay on AWS. Embeddings stay with Titan because the vector indexes were built with it,
+and a query must be embedded by the model that built its index. The Token Factory key is a
+SecureString in Parameter Store that only the MCP server's and the Alexa skill's roles may
+read; it never appears in a deployed service's environment, a stack template, or the
+deploy tools' environment (`scripts/cdk.sh` leaves it out).
+
+Not chosen: moving the embeddings to a Token Factory embedding model at the same time. It
+would mean re-indexing and re-calibrating the router's similarity floor for no gain the
+answers need.

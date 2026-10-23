@@ -25,6 +25,8 @@ choosing which tools to call, and turning a verified answer into speech.
  │  Bedrock Guardrails on input                                 │          │
  │  router → [triage] → planner → advisor tool loop → verifier  │          │
  │  → explainer → PII redaction → Bedrock Guardrails on output  │          │
+ │  triage · advisor · explainer: NVIDIA Nemotron 70B on Nebius │          │
+ │  Token Factory (OpenAI-compatible API, key in Param. Store)  │          │
  │  AgentCore Memory: each conversation's previous turn         │          │
  └──────────────────────────────┬──────────────────────────────┘          │
                                 │ MCP client                              │
@@ -58,10 +60,10 @@ choosing which tools to call, and turning a verified answer into speech.
 
 ## The answer pipeline
 
-Two guards sit in front of the models. A circuit breaker shared by the process
-(`crewops.agent.breaker`) pauses Bedrock calls for a minute after three outage failures in a
-row, so answers come from the templates at once rather than after a timeout, then lets one
-call through to test it. An override check (`crewops.agent.injection`) refuses the common
+Two guards sit in front of the models. Circuit breakers shared by the process
+(`crewops.agent.breaker`), one for Nebius Token Factory and one for Bedrock, each pause their
+service's calls for a minute after three outage failures in a row, so answers come from the
+templates at once rather than after a timeout, then let one call through to test it. An override check (`crewops.agent.injection`) refuses the common
 prompt-injection phrasings before any model or guardrail call; its refusals and the
 guardrail's are written to the activity log (`SECURITY / AUDIT#…#BLOCKED_PROMPT`).
 
@@ -73,24 +75,30 @@ speech and is discarded unless it keeps every fact.
 |---|---|---|
 | Guardrail on input | 0 | Bedrock Guardrails screens the question for harmful content and prompt attacks. |
 | Spoken ids | 0 | Ids as voice input writes them ("see 3231", "C 32 31", "pee 2291", "D X 412") become C-3231, P-2291, DX412. Only the exact shape of an id is rewritten; a date or "see you at 10" is left alone. |
-| Conversation | 0 | Greetings, thanks, goodbyes and "who am I" are answered from the sign-in, before routing, so "hello" is never read as a lookup. |
+| Conversation | 0 | Greetings, thanks, goodbyes and "who am I" are answered from the sign-in, before routing, so "hello" is never read as a lookup. "Who are you", "what can I do", "what can a super admin do that I can't" and "can I relax a threshold" are answered from the caller's roles, in the same terms the server enforces. "What's waiting for me" reads an approver's sign-offs or what on a controller's desk needs a plan. |
+| Rule questions | 0 | "What's the FDP limit" or "how much rest does crew need", naming no one, goes to that rule's current text; "what are the rules" lists all seven. |
 | Router | 0 | Ordered regex rules classify the question; ids, dates and stations are extracted by pattern only. |
 | Semantic fallback | 0 | Embedding match against the example questions. Borrows the closest one's intent, never its ids or answer, and only above a similarity floor measured on paraphrases. |
-| Triage | 0–1 (Nova Micro) | Classifies intent only when both stages above abstain. No tools. A reply it cannot parse means a lookup. |
+| Triage | 0–1 (Nemotron 70B on Nebius) | Classifies intent only when both stages above abstain. No tools. A reply it cannot parse means a lookup. |
 | Whose records | 0 | "My" means the asker. Crew may look up their own profile, certificates and trips. Anyone else asking about "my certificate" or "my duty" is told they are not on the crew roster, rather than shown everyone's; a certificate question naming no one, no kind and no horizon is asked back. |
 | Premise check | 0 | Something the question states that the roster contradicts ("FO C-1042" for a captain, an unknown station) is asked about before anything runs. |
 | Planner | 0 | Makes the obvious first tool calls for the intent, and the calls that follow from their results, with the caller's own role checks. |
-| Advisor | 0–9 (Nova 2 Lite) | Consulted only when the planned calls produced nothing usable (the question named no exact ids, or every planned call failed). It sees the planned results as its own earlier calls, calls more through the caller's role checks, and drafts the answer, which must state at least one sourced fact. At most 8 rounds of tool calls, with the time budget checked before each model call; each call has one attempt and a firm timeout. Only a finished reply counts: a cut-off or filtered one is no answer. Cannot submit, approve or commit anything. |
+| Advisor | 0–9 (Nemotron 70B on Nebius) | Consulted only when the planned calls produced nothing usable (the question named no exact ids, or every planned call failed). It sees the planned results as its own earlier calls, calls more through the caller's role checks, and drafts the answer, which must state at least one sourced fact. At most 8 rounds of tool calls, with the time budget checked before each model call; each call has one attempt and a firm timeout. Only a finished reply counts: a cut-off or filtered one is no answer. Cannot submit, approve or commit anything. |
 | Verifier | 0 | Every id, number, time, name and rule verdict in the draft must appear in a tool result of the same turn. On failure the draft is replaced by the template. |
 | Template | 0 | The tool results as short sentences. Copied, never computed, so it always verifies. |
-| Explainer | 0–1 (Nova 2 Lite) | Rewrites a judgement answer (tier 2 and 3) for speech, while half the time budget remains. The rewrite must pass the verifier and keep every id, time and number of the template, or the template stands. |
+| Explainer | 0–1 (Nemotron 70B on Nebius) | Rewrites a judgement answer (tier 2 and 3) for speech, while half the time budget remains. The rewrite must pass the verifier and keep every id, time and number of the template, or the template stands. |
 | PII redaction | 0 | Removes contact and government-id data at the output boundary, after verification. |
 | Guardrail on output | 0 | Bedrock Guardrails screens the final answer. |
 
 Every model call has a fallback that still answers: a failed or unverifiable draft gives
 the template, a failed triage gives a lookup, and an unreachable guardrail is logged and
 skipped, since the verifier, role checks and redaction do not depend on it. Tests run every
-model role against a scripted stand-in for Bedrock, so they cost nothing.
+model role against scripted stand-ins for Token Factory and Bedrock, so they cost nothing.
+
+The model roles speak Bedrock's Converse shapes; `crewops.agent.nebius.NebiusClient`
+translates them to and from Token Factory's chat completions (tool calls, tool results,
+finish reasons, token usage). A finish other than a completed turn or a tool call, or a tool
+call whose arguments are not a JSON object, counts as no answer, exactly as before.
 
 Without any model, the pipeline answers from the rules, planner and template. On the
 38 example questions, the rules route every one to its tier, and 35 get a verified answer;
@@ -467,6 +475,18 @@ streamable HTTP, a code package on Linux ARM64, billed per second while a sessio
   nothing, carried ids pass the same role checks as typed ones, and a memory failure only
   means the question stands on its own. What is waiting for whom is always read from
   the table, never from memory.
+- **Revoking a report.** An admin withdraws a report filed in error with `revoke_report`
+  and a reason: a reporter's, a crew member's own absence, or planned leave. It is allowed
+  while nothing has been approved (REPORTED, OPTIONS_READY or SUBMITTED, or an absence only
+  recorded); a plan waiting for approval is withdrawn in the same transaction, so it can't be
+  approved afterwards. The disruption becomes REVOKED, drops out of every open list, and the
+  crew it named count as available again. After approval the roster has changed, so the
+  controller resolves it instead.
+- **Passwords.** `reset_password` gives a team member a new random password, returned once
+  to the admin to pass on, and logged without the password. An admin resets crew, reporters,
+  controllers, approvers and auditors; only a super admin resets an admin. Nobody resets their
+  own here, and the speaker device's password is only replaced by `web_env --speaker`.
+  `team_accounts` lists who the caller may reset.
 - **Alert addresses.** Admins manage the email alert addresses with `alert_addresses`,
   `add_alert_address` and `remove_alert_address` (see [Notifications](#notifications)).
 - **Rule thresholds.** Four numbers in the legality rules (the flight duty period limit, duty
@@ -602,8 +622,8 @@ they submitted.
 | Controller | Yes | Yes | Yes | | Own desk | |
 | Approver | Yes | Yes | | Yes | Yes | |
 | Auditor | | Read only | | | Yes | |
-| Admin | | | | | Yes | Tighten rule thresholds, alert addresses |
-| Super admin | | | | | Yes | As admin, and relax rule thresholds |
+| Admin | Planned leave | Read only | | | Yes | Revoke reports filed in error, reset the passwords of everyone but admins and the speaker, tighten rule thresholds, alert addresses |
+| Super admin | Planned leave | Read only | | | Yes | As admin, and reset admins' passwords and relax rule thresholds |
 
 ### What can be reported
 
@@ -639,7 +659,12 @@ REPORTED ─► OPTIONS_READY ─► SUBMITTED ───────────
                           │       ├─► REJECTED by an approver, with a reason ─┐
                           │       ├─► WITHDRAWN by the controller             ├─► back to
                           │       └─► STALE if the roster changed             ┘   OPTIONS_READY
-                          └─► CLOSED by a controller, with a reason, when nothing can be covered
+                          └─► RESOLVING: a controller says what was done, when nothing can be
+                              covered or it was handled elsewhere ─► CLOSED when a different
+                              person, an approver, signs it off; or back to OPTIONS_READY if
+                              the approver sends it back with a reason
+
+REPORTED, OPTIONS_READY or SUBMITTED ─► REVOKED by an admin, with a reason (filed in error)
 ```
 
 Approving is the commit. When the approver approves, the system re-checks legality and writes
@@ -683,7 +708,8 @@ caller):
 - Agents never decide. The advisor and the disruption analysis only prepare options. Submit,
   approve and reject require a signed-in person with the right role.
 - Admins configure; they do not operate. Admin and super admin cannot submit or approve
-  plans unless they also hold that role. Every role change is audited.
+  plans unless they also hold that role. They can revoke a report filed in error, but only
+  before cover is approved. Every role change, revoke and password reset is audited.
 - Each transition is logged with who, when, which plan and why.
 
 ## Demo flow
