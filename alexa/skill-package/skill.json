@@ -32,7 +32,7 @@
     "apis": {
       "custom": {
         "endpoint": {
-          "uri": "https://oa6un33wvciq4taa43x2nzdm4i0vafct.lambda-url.ap-southeast-2.on.aws/",
+          "uri": "REPLACE_WITH_SkillEndpointUrl",
           "sslCertificateType": "Wildcard"
         }
       }
@@ -44,7 +44,7 @@
     "events": {
       "publications": [{ "eventName": "AMAZON.MessageAlert.Activated" }],
       "endpoint": {
-        "uri": "https://oa6un33wvciq4taa43x2nzdm4i0vafct.lambda-url.ap-southeast-2.on.aws/",
+        "uri": "REPLACE_WITH_SkillEndpointUrl",
         "sslCertificateType": "Wildcard"
       },
       "subscriptions": [

@@ -167,8 +167,11 @@ def plan_team(
                     f"enable {user}",
                     lambda u=user: cognito.admin_enable_user(UserPoolId=pool_id, Username=u),
                 )
-            if reset_passwords or account.status in STUCK:
-                why = "" if reset_passwords else " (it has no usable one)"
+            # The speaker device has a password of its own (web_env --speaker), which the hosted
+            # app and the TV sign in with: a team reset would lock them out.
+            device = Role.SPEAKER in m.roles
+            if (reset_passwords and not device) or account.status in STUCK:
+                why = "" if reset_passwords and not device else " (it has no usable one)"
                 plan.add(
                     f"set the password of {user}{why}",
                     lambda u=user: _set_password(cognito, pool_id, u, password()),

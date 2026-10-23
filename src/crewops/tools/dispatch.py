@@ -15,6 +15,7 @@ Who may call what is decided here, in code, from the caller's verified roles:
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 from collections.abc import Mapping
@@ -143,6 +144,8 @@ def _check(
                 f"Look it up rather than constructing it.{hint}",
             )
     if _TYPES["number"](value):
+        if not math.isfinite(value):
+            raise _bad(path, "must be a finite number")
         if (n := spec.get("minimum")) is not None and value < n:
             raise _bad(path, f"must be at least {n}")
         if (n := spec.get("exclusiveMinimum")) is not None and value <= n:

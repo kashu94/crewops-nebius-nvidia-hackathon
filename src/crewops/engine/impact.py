@@ -19,7 +19,13 @@ from datetime import date, datetime, timedelta
 from crewops.domain import Flight, Rank
 from crewops.engine.duty import hours_between
 from crewops.engine.legality import assess
-from crewops.engine.options import AlreadyStarted, Option, OptionsResult, find_options
+from crewops.engine.options import (
+    SUBSTITUTES,
+    AlreadyStarted,
+    Option,
+    OptionsResult,
+    find_options,
+)
 from crewops.engine.world import World
 
 RELEASE_AFTER_LAST_ARRIVAL = timedelta(minutes=30)
@@ -218,20 +224,25 @@ def joint_plan(
 
     combinations = math.prod(len(opts) for _, opts in slots) if slots else 0
     if slots and combinations <= JOINT_EXHAUSTIVE_LIMIT:
-        best: tuple[int, tuple[Option, ...]] | None = None
+        # Fewest substitutes first (another rank in a seat only when its own rank is short,
+        # as regulation allows), then the lowest total cost.
+        best: tuple[tuple[int, int], tuple[Option, ...]] | None = None
         ties = 0
         for combo in itertools.product(*(opts for _, opts in slots)):
             ids = [o.crew_id for o in combo]
             if len(set(ids)) != len(ids):
                 continue
-            total = sum(o.cost_inr for o in combo)
-            if best is None or total < best[0]:
-                best, ties = (total, combo), 0
-            elif total == best[0]:
+            score = (
+                sum(o.strategy in SUBSTITUTES for o in combo),
+                sum(o.cost_inr for o in combo),
+            )
+            if best is None or score < best[0]:
+                best, ties = (score, combo), 0
+            elif score == best[0]:
                 ties += 1
         if best is not None:
             assignments = tuple((seat, o) for (seat, _), o in zip(slots, best[1], strict=True))
-            return JointPlan(assignments, tuple(unfilled), best[0], ties, True)
+            return JointPlan(assignments, tuple(unfilled), best[0][1], ties, True)
         # no plan fills every seat with different people, fall back to greedy
 
     return _greedy(slots, unfilled)

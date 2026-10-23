@@ -54,7 +54,8 @@ that: you act as the signed-in person, with exactly their role's rights.
      a spoken summary), then `my_queue`.
    - **Reporter:** `operations_overview` for today's flights and who is out.
    - **Crew:** `my_roster` (their trips, duty clock, any notice for them).
-   - **Admin or auditor:** `activity_log`, or `disruptions` for the feed.
+   - **Admin:** `activity_log`, or `disruptions` for the feed.
+   - **Auditor:** `disruptions` (the activity log is for admins).
 
 ## The disruption lifecycle
 
@@ -62,7 +63,8 @@ that: you act as the signed-in person, with exactly their role's rights.
 REPORTED ──analysis (≈1 min)──> OPTIONS_READY ──submit_plan──> SUBMITTED ──approve_plan──> COMMITTED
                                   │      ▲                        │
                                   │      └── reject / withdraw / STALE (roster changed) ──┘
-                                  └── close_disruption (nothing coverable, or handled elsewhere) ──> CLOSED
+                                  └── close_disruption (nothing coverable, or handled elsewhere) ──> RESOLVING
+                                        ──> confirm_resolution by an approver ──> CLOSED (or return_resolution)
 ```
 
 - The analysis runs automatically when a report arrives: what it breaks, every legal way to
@@ -105,7 +107,9 @@ something moved meanwhile and the plan went back to the controller (say why, fro
 
 ### Report a disruption (reporter, controller, approver; crew for themselves)
 1. `report_reference` for valid crew ids, flights, gates and stations (never guess an id;
-   `crew_tool("suggest_crew_ids", {"near": "C-10"})` offers real ones to confirm).
+   controllers and approvers may also ask `crew_tool("suggest_crew_ids", {"near": "C-10"})`
+   for real ones to confirm). Crew skip this: they report only themselves, with the
+   `crew_id` from `whoami`.
 2. Dates run from today to two months ahead. Further ahead is planned leave, booked by an
    admin.
 3. Read the report back, then `report_disruption(report_type, details)`. It is checked and

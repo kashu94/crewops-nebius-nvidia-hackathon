@@ -133,9 +133,10 @@ def test_ranked_by_what_each_costs_and_risk_never_ranks(world, sick_captain):
 def test_policies(sick_captain):
     assert sick_captain.policies["cheapest"].crew_id == "C-3310"
     assert sick_captain.policies["least_delay"].delay_hours == 0.0
-    # C-3310 is one of three captains on call at BLR that day, so using them gives up a
-    # third of the reserve cover. A day-off callout keeps all of it.
-    assert sick_captain.recommended.resilience == 66.7
+    # Three captains are on call at BLR that day, one per airline. C-3310 is Konkan's only
+    # one, and the others can't cover a Konkan trip, so using them gives up all of Konkan's
+    # reserve cover. A day-off callout keeps all of it.
+    assert sick_captain.recommended.resilience == 0.0
     assert sick_captain.policies["keeps_most_reserve_cover"].strategy is Strategy.DAY_OFF_CALLOUT
 
 
@@ -213,3 +214,27 @@ def test_a_cabin_seat_may_operate_short_only_above_the_minimum(world):
     assert find_options(world, "P-2291", Rank.CABIN_CREW).short_crew is None
     # A first officer is never "short": two pilots always.
     assert find_options(world, "P-2202", Rank.FIRST_OFFICER).short_crew is None
+
+
+def test_next_tier_premium_ignores_a_cheaper_substitute(world):
+    from dataclasses import replace
+    from datetime import date
+
+    # One captain left, so command-qualified first officers follow. Make the first of them
+    # cheaper than that captain: the premium is still over the recommendation, never a
+    # negative step down to an option listed after it.
+    legal = [o.crew_id for o in find_options(world, "P-2291", Rank.CAPTAIN).crew_options]
+    short = _without(world, legal[:-1], date(2026, 10, 13))
+    upgrade = next(
+        o
+        for o in find_options(short, "P-2291", Rank.CAPTAIN).crew_options
+        if o.strategy is Strategy.COMMAND_UPGRADE
+    )
+    cheap = replace(short, seniority={**short.seniority, upgrade.crew_id: 0})
+    result = find_options(cheap, "P-2291", Rank.CAPTAIN)
+    rec = result.recommended
+    assert rec.crew_id == legal[-1]
+    cheaper = [o for o in result.crew_options if o.cost_inr < rec.cost_inr]
+    assert cheaper and cheaper[0].strategy is Strategy.COMMAND_UPGRADE
+    dearer = [o.cost_inr for o in result.crew_options if o.cost_inr > rec.cost_inr]
+    assert result.next_tier_premium_inr == (min(dearer) - rec.cost_inr if dearer else 0)

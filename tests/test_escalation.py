@@ -3,6 +3,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from test_plans import ANANYA, disruption
 
 from crewops.analysis.runner import Operation
@@ -125,3 +126,24 @@ def test_the_speaker_announces_an_escalation(ops_table):
         "Medium severity. Still waiting: C-1042 unavailable 2026-10-13 to 2026-10-14"
     )
     assert alert["text"].endswith("On Ananya Iyer's desk. The duty supervisor has been told.")
+
+
+def test_an_email_that_fails_leaves_no_escalation_mark_so_the_retry_sends_it(ops_table):
+    OpsStore(ops_table).put_seed(load_seed())
+    disruption(ops_table, "r-sick1042", "C-1042", "2026-10-13", "2026-10-14")
+    since = datetime.now(UTC) + timedelta(seconds=1)
+    later = since + timedelta(minutes=10)
+    stamp = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def broken(alert):
+        raise RuntimeError("SNS throttled")
+
+    with pytest.raises(RuntimeError):
+        check(ops_table, "r-sick1042", stamp, 10, broken, later, describe_report)
+    events = [e["action"] for e in plan_store.audit_trail(ops_table, "r-sick1042")]
+    assert "ESCALATED" not in events
+    sent = []
+    assert check(ops_table, "r-sick1042", stamp, 10, sent.append, later, describe_report) == (
+        "escalated"
+    )
+    assert len(sent) == 1

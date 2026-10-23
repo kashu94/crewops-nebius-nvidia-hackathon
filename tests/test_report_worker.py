@@ -258,3 +258,27 @@ def test_resend_with_changed_details_is_still_a_conflict(table):
     changed = report(details={"crew_id": "C-1042", "from_date": "2026-10-13", "reason": "fatigue"})
     outcome = handle(table, changed)
     assert outcome.status == "rejected" and "different report" in outcome.reason
+
+
+@pytest.mark.parametrize(
+    ("new_gate", "reason"),
+    [
+        ("BLR-G9", "unknown gate BLR-G9"),
+        ("HYD-G1", "not at DX401-2026-10-13's departure station"),
+        ("BLR-E1", None),  # an emergency gate at the station is a real gate
+        ("BLR-G4", "already boards at BLR-G4"),  # its own gate is no change
+    ],
+)
+def test_gate_change_to_a_gate_that_is_not_there_is_refused(table, new_gate, reason):
+    # Analysed, a gate nobody has a slot record for would always look "free".
+    doc = report(
+        "gate_change",
+        {"flight_id": "DX401-2026-10-13", "new_gate": new_gate},
+        report_id="r-gate0001",
+    )
+    outcome = handle(table, doc)
+    if reason is None:
+        assert outcome.status == "stored"
+        return
+    assert outcome.status == "rejected" and reason in outcome.reason
+    assert get_disruption(table, "r-gate0001") is None

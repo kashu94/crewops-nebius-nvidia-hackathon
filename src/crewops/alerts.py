@@ -29,10 +29,18 @@ SCOPES = (ROOM, APPROVALS, *(d.desk_id for d in DESKS))
 
 SENT_BACK = ("REJECTED", "WITHDRAWN", "STALE")
 """Audit actions that return a plan to its desk."""
-FOR_DESK = ("OPTIONS_READY", "ESCALATED", *SENT_BACK, "COMMITTED", "CLOSED")
+FOR_DESK = (
+    "OPTIONS_READY",
+    "ESCALATED",
+    *SENT_BACK,
+    "RESOLUTION_RETURNED",
+    "COMMITTED",
+    "CLOSED",
+    "REVOKED",
+)
 """Events a desk speaker announces. ANALYSIS_FAILED isn't here because such a report has no
 desk yet; only the room speaker hears about it."""
-FOR_APPROVALS = ("SUBMITTED",)
+FOR_APPROVALS = ("SUBMITTED", "RESOLUTION_SUBMITTED")
 
 STRATEGY = {
     "reserve_callout": "a reserve callout",
@@ -51,8 +59,17 @@ def spoken(text: str) -> str:
     """Rewrite for TTS: "C-1042" -> "C 1042", ISO dates -> "13 October", "₹23,090" ->
     "23,090 rupees"."""
     text = _ID.sub(r"\1 \2", text)
-    text = _DATE.sub(lambda m: _day(date(*map(int, m.groups()))), text)
+    text = _DATE.sub(_spoken_date, text)
     return _RUPEES.sub(r"\1 rupees", text)
+
+
+def _spoken_date(match: re.Match[str]) -> str:
+    """Free text (a reject reason, a model's answer) can hold something date-shaped that is
+    no date, like "2026-02-30": leave it as written."""
+    try:
+        return _day(date(*map(int, match.groups())))
+    except ValueError:
+        return match.group(0)
 
 
 def _day(d: date | datetime) -> str:
@@ -116,6 +133,16 @@ def brief(
         title = "Plan sent back"
         text = f"The plan for {happened} was sent back" + (f": {reason}." if reason else ".")
         text += on_desk
+    elif action == "RESOLUTION_SUBMITTED":
+        title = "Waiting for sign-off"
+        text = f"{happened} was handled by {latest.get('actor')}" + (
+            f": {reason}." if reason else "."
+        )
+        text += " It needs an approver's sign-off."
+    elif action == "RESOLUTION_RETURNED":
+        title = "Sent back"
+        text = f"The resolution of {happened} was sent back" + (f": {reason}." if reason else ".")
+        text += on_desk
     elif action == "SUBMITTED":
         title = "Waiting for approval"
         text = f"A plan for {happened} is waiting for approval, from {latest.get('actor')}."
@@ -124,6 +151,9 @@ def brief(
     elif action == "CLOSED":
         title = "Closed"
         text = f"{happened} was closed" + (f": {reason}." if reason else ".")
+    elif action == "REVOKED":
+        title = "Revoked"
+        text = f"{happened} was revoked by an admin" + (f": {reason}." if reason else ".")
     else:
         title, text = action.replace("_", " ").title(), f"{happened}: {action.lower()}."
     rated = (
@@ -157,10 +187,13 @@ STAGE = {
     "OPTIONS_READY": 1,
     "ESCALATED": 1,
     "SUBMITTED": 2,
+    "RESOLUTION_SUBMITTED": 2,
+    "RESOLUTION_RETURNED": 3,
     **dict.fromkeys(SENT_BACK, 3),
     "APPROVED": 3,
     "COMMITTED": 4,
     "CLOSED": 4,
+    "REVOKED": 4,
 }
 """Lifecycle order of audit actions. Breaks ties when two events share a timestamp (a plan
 submitted and rejected in the same second)."""

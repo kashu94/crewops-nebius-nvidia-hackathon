@@ -260,6 +260,14 @@ def test_a_token_factory_outage_still_gets_an_answer():
 # -- The API key ------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def no_key_read_earlier(monkeypatch):
+    """Each test starts with no key remembered from another test."""
+    from crewops.agent import nebius
+
+    monkeypatch.setattr(nebius, "_KEYS", {})
+
+
 def test_the_key_comes_from_the_environment_first():
     env = {"NEBIUS_API_KEY": " nb-local "}
     assert api_key("/crewops-test/nebius/api-key", "ap-southeast-2", env) == "nb-local"
@@ -273,3 +281,140 @@ def test_the_deployed_key_comes_from_parameter_store(moto_aws):
 
 def test_no_key_anywhere_means_no_models(moto_aws):
     assert api_key("/crewops-test/nebius/api-key", "ap-southeast-2", {}) is None
+
+
+# -- Review fixes: one call per turn, ids, errors, time left, the key on a hiccup ---------
+
+
+def test_several_calls_in_one_turn_become_one_call_per_turn():
+    """Llama 3.1 chat templates refuse an assistant turn with two tool calls."""
+    messages = [
+        {"role": "user", "content": [{"text": "q"}]},
+        {
+            "role": "assistant",
+            "content": [
+                {"toolUse": {"toolUseId": "planned-0", "name": "lookup", "input": {"a": 1}}},
+                {"toolUse": {"toolUseId": "planned-1", "name": "explain_rule", "input": {}}},
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"toolResult": {"toolUseId": "planned-0", "content": [{"text": "r0"}]}},
+                {"toolResult": {"toolUseId": "planned-1", "content": [{"text": "r1"}]}},
+            ],
+        },
+    ]
+    chat = to_chat_request(NEMOTRON_70B, None, messages, {}, None)["messages"]
+    assert [m["role"] for m in chat] == ["user", "assistant", "tool", "assistant", "tool"]
+    assert all(len(m["tool_calls"]) == 1 for m in chat if m["role"] == "assistant")
+    assert [m["tool_call_id"] for m in chat if m["role"] == "tool"] == ["planned-0", "planned-1"]
+    assert chat[2]["content"] == "r0" and chat[4]["content"] == "r1"
+
+
+def test_tool_calls_without_ids_get_distinct_ones():
+    reply = chat_tool("lookup", "{}")
+    second = {"type": "function", "function": {"name": "explain_rule", "arguments": "{}"}}
+    reply["choices"][0]["message"]["tool_calls"][0].pop("id")
+    reply["choices"][0]["message"]["tool_calls"].append(second)
+    ids = [
+        b["toolUse"]["toolUseId"] for b in from_chat_response(reply)["output"]["message"]["content"]
+    ]
+    assert ids == ["call-0", "call-1"]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        __import__("http.client").client.IncompleteRead(b"half"),
+        __import__("ssl").SSLError("bad record mac"),
+        ConnectionResetError("reset"),
+    ],
+)
+def test_a_connection_lost_half_way_is_an_outage(failure):
+    client = NebiusClient("k", opener=FakeTokenFactory([failure]))
+    with pytest.raises(NebiusUnavailable) as caught:
+        client.converse(modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}])
+    assert is_outage(caught.value)
+
+
+def test_a_reply_that_is_not_json_is_an_outage_not_a_crash():
+    class NotJson(FakeTokenFactory):
+        def __call__(self, request, timeout=None):
+            return Response(b"<html>502 Bad Gateway</html>")
+
+    with pytest.raises(NebiusError) as caught:
+        NebiusClient("k", opener=NotJson()).converse(
+            modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}]
+        )
+    assert caught.value.status == 502 and is_outage(caught.value)
+
+
+def test_a_call_never_waits_longer_than_the_time_left():
+    seen = []
+
+    class Timed(FakeTokenFactory):
+        def __call__(self, request, timeout=None):
+            seen.append(timeout)
+            return super().__call__(request, timeout)
+
+    client = NebiusClient("k", timeout=6.0, opener=Timed([chat_text("a"), chat_text("b")]))
+    question = [{"role": "user", "content": [{"text": "q"}]}]
+    client.converse(modelId="m", messages=question)
+    client.converse(modelId="m", messages=question, timeout=1.5)
+    assert seen == [6.0, 1.5]
+
+
+def test_the_advisor_gives_each_round_only_the_time_left():
+    timeouts = []
+
+    class Recording:
+        def __init__(self, replies):
+            self.replies = list(replies)
+
+        def converse(self, **request):
+            timeouts.append(request["timeout"])
+            return from_chat_response(self.replies.pop(0))
+
+    advisor = ModelAdvisor(
+        Recording([chat_tool("lookup", json.dumps(SEATS)), chat_text("DX401 ... 162.")]),
+        NEMOTRON_70B,
+        tools(),
+        budget_seconds=6.0,
+    )
+    Pipeline(tools(), Router(vocab(), examples()), drafter=advisor).answer(UNPLANNED, CONTROLLER)
+    assert len(timeouts) == 2 and 0 < timeouts[1] <= timeouts[0] <= 6.0
+
+
+def test_a_parameter_store_hiccup_keeps_the_key_read_earlier(moto_aws, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    from crewops.agent import nebius
+
+    name = "/crewops-test/nebius/api-key"
+    boto3.client("ssm", region_name="ap-southeast-2").put_parameter(
+        Name=name, Value="nb-first", Type="SecureString"
+    )
+    assert api_key(name, "ap-southeast-2", {}) == "nb-first"
+
+    def failing(code):
+        class Ssm:
+            def get_parameter(self, **_):
+                raise ClientError({"Error": {"Code": code, "Message": "x"}}, "GetParameter")
+
+        class Session:
+            def __init__(self, **_):
+                pass
+
+            def client(self, *_, **__):
+                return Ssm()
+
+        monkeypatch.setattr(boto3, "Session", Session)
+
+    failing("ThrottlingException")  # a hiccup: the key read earlier stands in
+    assert api_key(name, "ap-southeast-2", {}) == "nb-first"
+    failing("ParameterNotFound")  # removed on purpose: no models
+    assert api_key(name, "ap-southeast-2", {}) is None
+    failing("ThrottlingException")
+    monkeypatch.setattr(nebius, "KEY_REUSE_SECONDS", 0)  # too long ago to trust
+    assert api_key(name, "ap-southeast-2", {}) is None

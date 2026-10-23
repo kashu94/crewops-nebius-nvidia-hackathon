@@ -160,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         body += kept_speaker_lines(args.out)
     args.out.write_text("\n".join(body) + "\n")
+    os.chmod(args.out, 0o600)  # it can hold the speaker device's password
     print(f"Wrote {args.out}")
     return 0
 

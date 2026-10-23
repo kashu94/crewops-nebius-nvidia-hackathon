@@ -115,3 +115,18 @@ def test_triage_casing_is_tolerated():
         triage=lambda i, q: '{"intent": "check_legality", "confidence": "HIGH"}',
     )
     assert router.route("Tell me about C-2087 please").intent is Intent.CHECK_LEGALITY
+
+
+def test_a_failing_semantic_search_falls_through_instead_of_failing_the_question():
+    def down(q):
+        raise TimeoutError
+
+    decided = Router(vocab(), examples(), search=down, floor=0.1).route("Tell me about C-2087")
+    assert decided.decided_by == "default" and decided.entities.crew_ids == ["C-2087"]
+    with_triage = Router(
+        vocab(),
+        examples(),
+        search=down,
+        triage=lambda i, q: '{"intent": "LOOKUP_RISK", "confidence": "medium"}',
+    )
+    assert with_triage.route("Tell me about C-2087").decided_by == "triage"

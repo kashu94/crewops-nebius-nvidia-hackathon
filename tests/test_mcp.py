@@ -298,7 +298,9 @@ def test_a_gate_closure_is_handled_internally_and_resolved_with_a_remark(api):
         api.close(ROHIT, "r-gate-del1", "re-gated")
     assert err.value.code == "FORBIDDEN"
     out = api.close(ANANYA, "r-gate-del1", "DX402 bussed from stand 14; screens updated")
-    assert out["status"] == "CLOSED"
+    assert out["status"] == "RESOLVING"
+    assert api.show(IMRAN, "r-gate-del1")["outcome"].startswith("Handled by crew control; waiting")
+    assert api.confirm_resolution(MEERA, "r-gate-del1")["status"] == "CLOSED"
     trail = api.show(ANANYA, "r-gate-del1")["audit"]
     assert trail[-1]["reason"] == "DX402 bussed from stand 14; screens updated"
 
@@ -900,3 +902,238 @@ def test_the_ops_room_board_shows_every_open_disruption_most_serious_first(api):
     assert api.ops_board(ROHIT)["counts"] == board["counts"]
     with pytest.raises(ApiError):
         api.ops_board(CREW)
+
+
+def test_a_reload_started_before_a_plan_action_does_not_bring_back_the_old_roster():
+    import threading
+
+    release = threading.Event()
+    calls = []
+
+    def factory():
+        calls.append(1)
+        if len(calls) == 2:  # the background reload, reading the roster before the action
+            release.wait(5)
+            return "before"
+        return "loaded" if len(calls) == 1 else "after"
+
+    api = CrewOpsApi(None, factory, lambda _: None, plans=object(), cache_seconds=0)
+    assert api.live() == "loaded"
+    time.sleep(0.01)
+    assert api.live() == "loaded"  # stale: a reload starts in the background
+    api.cache_seconds = 3600
+    api.invalidate()  # a plan was approved here meanwhile
+    assert api.live() == "after"
+    release.set()
+    for _ in range(500):
+        if not api._refreshing:
+            break
+        time.sleep(0.01)
+    assert api.live() == "after"
+
+
+def test_the_disruption_list_rates_severity_from_today_like_the_record(api, monkeypatch):
+    import crewops.mcp.api as api_module
+
+    rated_on = []
+    real = api_module.severity
+
+    def spy(analysis, reported_utc=None, today=None):
+        rated_on.append(today)
+        return real(analysis, reported_utc, today)
+
+    monkeypatch.setattr(api_module, "severity", spy)
+    api.clock = lambda: datetime(2026, 10, 13, 6, tzinfo=UTC)
+    api.disruptions(ROHIT)
+    listed = set(rated_on)
+    rated_on.clear()
+    api.show(ROHIT, "r-sick1042")
+    # "flies today" counts from today on the list too, not from when it was reported
+    assert listed == set(rated_on) != {None}
+
+
+def test_the_reporting_desk_sees_crew_reports_without_why(api):
+    crew = Caller("crew2087", frozenset({Role.CREW}), crew_id="C-2087")
+    api.report(
+        crew,
+        "crew_unavailable",
+        {"crew_id": "C-2087", "from_date": "2026-10-16", "reason": "fatigue"},
+        "worked three nights running",
+    )
+    (seen,) = api.my_reports(IMRAN, "crew")
+    assert seen["details"]["crew_id"] == "C-2087" and seen["details"]["from_date"] == "2026-10-16"
+    assert "reason" not in seen["details"] and not seen["narrative"]
+    (full,) = api.my_reports(ROHIT, "crew")  # crew control sees why
+    assert full["details"]["reason"] == "fatigue" and full["narrative"]
+    (own,) = api.my_reports(crew)
+    assert own["details"]["reason"] == "fatigue"
+
+
+def test_a_flight_id_without_its_date_is_refused_as_invalid(api):
+    for kind, details in (
+        ("flight_delay", {"flight_id": "DX401", "delay_minutes": 30}),
+        ("gate_change", {"flight_id": "DX401", "new_gate": "BLR-G2"}),
+    ):
+        with pytest.raises(ApiError) as err:
+            api.report(IMRAN, kind, details)
+        assert err.value.code == "INVALID" and "flight_id" in err.value.message
+
+
+def test_a_reserve_reported_out_today_is_not_counted_on_call(api):
+    from dataclasses import replace
+
+    seed = load_seed()
+    world = build_world(seed)
+    today = world.snapshot_utc.date()
+    on_call = sorted(
+        r for r, duties in world.reserves.items() if any(today in d.dates for d in duties)
+    )
+    before = api.ops_board(ROHIT)["day"]["reserves_on_call"]
+    assert before == len(on_call)
+    sick = replace(world, unavailable={**world.unavailable, on_call[0]: ((today, "sick"),)})
+    api.live_factory = lambda: Live(CrewOpsTools(sick, seed))
+    api.invalidate()
+    board = api.ops_board(ROHIT)
+    assert board["day"]["reserves_on_call"] == before - 1
+    assert board["day"]["reserves_on_call"] == sum(r["on_call"] for r in board["reserve_cover"])
+
+
+# -- Admins: revoke a report filed in error, reset a password --------------------------------
+
+PRIYA = Caller("priya", frozenset({Role.ADMIN}))
+VIKRAM = Caller("vikram", frozenset({Role.SUPER_ADMIN}))
+
+
+def test_only_an_admin_revokes_and_only_before_cover_is_approved(api):
+    for who in (ROHIT, MEERA, IMRAN, CREW):
+        with pytest.raises(ApiError) as err:
+            api.revoke_report(who, "r-sick1042", "filed twice")
+        assert err.value.code == "FORBIDDEN"
+    with pytest.raises(ApiError) as err:
+        api.revoke_report(PRIYA, "r-sick1042", "  ")
+    assert err.value.code == "INVALID"
+
+    # A plan waiting for approval is withdrawn with it, so nobody can approve it after.
+    submitted = api.submit(ROHIT, "r-sick1042")
+    out = api.revoke_report(PRIYA, "r-sick1042", "C-1042 reported the wrong week")
+    assert out == {"disruption_id": "r-sick1042", "status": "REVOKED", "was": "SUBMITTED"}
+    with pytest.raises(ApiError):
+        api.approve(MEERA, "r-sick1042", submitted["plan_id"])
+    with pytest.raises(ApiError) as err:
+        api.revoke_report(VIKRAM, "r-sick1042", "again")
+    assert err.value.code == "WRONG_STATE" and "already revoked" in err.value.message
+
+    # Gone from the open lists, and C-1042 counts as available again.
+    assert all(d["disruption_id"] != "r-sick1042" for d in api.disruptions(ROHIT))
+    assert "r-sick1042" not in {q.get("disruption_id") for q in api.queue(ROHIT)}
+    trail = [
+        e
+        for e in api.table.query(
+            KeyConditionExpression="pk = :pk",
+            ExpressionAttributeValues={":pk": "DISRUPTION#r-sick1042"},
+        )["Items"]
+        if e["sk"].startswith("AUDIT")
+    ]
+    assert any(e["action"] == "REVOKED" and e["actor"] == "priya" for e in trail)
+
+
+def test_a_report_whose_cover_was_approved_is_not_revoked(api):
+    submitted = api.submit(ROHIT, "r-sick1042")
+    api.approve(MEERA, "r-sick1042", submitted["plan_id"])
+    with pytest.raises(ApiError) as err:
+        api.revoke_report(PRIYA, "r-sick1042", "too late")
+    assert err.value.code == "WRONG_STATE" and "roster changed" in err.value.message
+
+
+class FakeAccounts:
+    def __init__(self):
+        self.set = {}
+
+    def set_password(self, username, password):
+        self.set[username] = password
+
+
+def test_password_resets_follow_admin_and_super_admin_lines(api):
+    from crewops.auth.provision import password_problems
+
+    accounts = api.accounts = FakeAccounts()
+    team = [
+        ("c1042.nair", "A. Nair", ["crew"], "C-1042", None),
+        ("rohit", "Rohit Malhotra", ["controller"], None, "desk-2"),
+        ("priya", "Priya Desai", ["admin"], None, None),
+        ("asha", "Asha Rao", ["admin"], None, None),
+        ("vikram", "Vikram Saxena", ["super_admin"], None, None),
+        ("ops.speaker", "Ops Room Speaker", ["speaker"], None, None),
+    ]
+    for user, name, roles, crew_id, desk in team:
+        put_profile(api.table, profile_item(user, name, roles, crew_id, desk))
+
+    out = api.reset_password(PRIYA, "C1042.Nair ")
+    assert out["username"] == "c1042.nair" and accounts.set["c1042.nair"] == out["password"]
+    assert password_problems(out["password"]) == []
+    assert api.reset_password(PRIYA, "rohit")["password"] != out["password"]
+
+    for caller, user, why in (
+        (ROHIT, "c1042.nair", "only an admin"),
+        (PRIYA, "asha", "only a super admin"),
+        (PRIYA, "vikram", "only a super admin"),
+        (PRIYA, "priya", "your own"),
+        (VIKRAM, "ops.speaker", "web_env --speaker"),
+    ):
+        with pytest.raises(ApiError) as err:
+            api.reset_password(caller, user)
+        assert err.value.code == "FORBIDDEN" and why in err.value.message
+    assert api.reset_password(VIKRAM, "asha")["username"] == "asha"
+    with pytest.raises(ApiError) as err:
+        api.reset_password(VIKRAM, "nobody")
+    assert err.value.code == "NOT_FOUND"
+
+    may = {a["username"]: a["may_reset"] for a in api.team_accounts(PRIYA)}
+    assert may == {
+        "asha": False,
+        "c1042.nair": True,
+        "ops.speaker": False,
+        "priya": False,
+        "rohit": True,
+        "vikram": False,
+    }
+    assert {a["username"] for a in api.team_accounts(VIKRAM) if a["may_reset"]} == {
+        "asha",
+        "c1042.nair",
+        "priya",
+        "rohit",
+    }
+    # Each reset is in the admin's activity log, without the password.
+    resets = [e for e in api.activity(VIKRAM) if e["action"] == "PASSWORD_RESET"]
+    assert len(resets) == 3 and all(out["password"] not in e.get("reason", "") for e in resets)
+
+
+def test_a_reserve_sees_their_standby_days_and_name(api):
+    reserve = Caller("c3310", frozenset({Role.CREW}), crew_id="C-3310")
+    roster = api.my_roster(reserve)
+    assert roster["pairings"] == [] and roster["name"] == "D. Reddy"
+    assert roster["rank"] == "Captain"
+    assert roster["on_call"][0] == {
+        "date": "2026-10-12",
+        "base": "BLR",
+        "from_utc": "06:00",
+        "to_utc": "18:00",
+    }
+    # Someone who flies has trips and no standby.
+    assert api.my_roster(CREW)["on_call"] == []
+
+
+def test_a_gate_change_to_the_flights_own_gate_is_refused_at_once(api):
+    with pytest.raises(ApiError) as err:
+        api.report(
+            IMRAN,
+            "gate_change",
+            {"flight_id": "DX401-2026-10-13", "new_gate": "BLR-G4"},
+        )
+    assert err.value.code == "INVALID" and "already boards at BLR-G4" in err.value.message
+
+
+def test_a_speaker_polling_with_many_limits_cannot_grow_the_feed_cache(api):
+    for limit in range(1, 200):
+        api.speaker_feed(SPEAKER, "room", limit=limit)
+    assert len(api._feed_cache) <= 50  # limits are clamped before they key the cache

@@ -258,3 +258,18 @@ def test_a_rewording_may_neither_drop_nor_add_a_fact():
     assert keeps_every_fact(original, "For ₹18,500, D. Reddy (C-3310) covers P-2291.")
     assert not keeps_every_fact(original, "D. Reddy (C-3310) covers it.")
     assert not keeps_every_fact(original, original + " Or C-1526 for ₹24,000.")
+
+
+def test_an_id_written_loosely_is_still_checked():
+    assert not verify("c-9999 covers P-2291.", [OPTIONS]).ok
+    assert not verify("C9999 covers P-2291.", [OPTIONS]).ok
+    assert not verify("C-3310 covers P-2291 on flight dx999.", [OPTIONS]).ok
+    assert verify("c-3310 covers P-2291.", [OPTIONS]).ok
+
+
+def test_a_verdict_without_a_rule_id_must_match_the_engine():
+    legal = entry("check_legality", {"crew_id": "C-3310", "pairing_id": "P-2291", "legal": True})
+    assert not verify("C-3310 would breach duty limits on P-2291.", [legal]).ok
+    assert verify("C-3310 does not breach any limit on P-2291.", [legal]).ok
+    assert not verify("C-2087 passes every rule for P-2291.", [LEGALITY]).ok
+    assert verify("C-2087 exceeds the duty limit on P-2291.", [LEGALITY]).ok

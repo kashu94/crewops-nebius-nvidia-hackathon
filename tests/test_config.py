@@ -139,6 +139,9 @@ def test_load_env_file_applies_values_without_overriding_shell(tmp_path, private
         ("A=a=b#c", "a=b#c"),
         ("A=plain # note", "plain"),
         ("A=", ""),
+        ("A= # none yet", ""),
+        ("A=\t# none yet", ""),
+        ("A=#x", "#x"),
     ],
 )
 def test_env_value_edge_cases(tmp_path, private_environ, line, value):
@@ -195,3 +198,51 @@ def test_guardrail_is_pinned_to_a_published_version():
         Settings.from_env({"CREWOPS_GUARDRAIL_ID": "gr-1"})
     with pytest.raises(ConfigError, match="not DRAFT"):
         Settings.from_env({"CREWOPS_GUARDRAIL_ID": "gr-1", "CREWOPS_GUARDRAIL_VERSION": "DRAFT"})
+
+
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+def test_numbers_must_be_finite(value):
+    with pytest.raises(ConfigError, match="finite"):
+        Settings.from_env({"CREWOPS_RESPONSE_BUDGET_SECONDS": value})
+    with pytest.raises(ConfigError, match="CREWOPS_ROUTER_SEMANTIC_FLOOR"):
+        Settings.from_env({"CREWOPS_ROUTER_SEMANTIC_FLOOR": value})
+
+
+@pytest.mark.parametrize(
+    "key", ["CREWOPS_ROUTER_MODEL_ID", "CREWOPS_ADVISOR_MODEL_ID", "CREWOPS_EXPLAINER_MODEL_ID"]
+)
+@pytest.mark.parametrize("model", ["amazon.nova-micro-v1:0", "global.amazon.nova-2-lite-v1:0"])
+def test_a_bedrock_id_left_in_env_is_refused_for_the_chat_roles(key, model):
+    with pytest.raises(ConfigError, match="Bedrock model id"):
+        Settings.from_env({key: model})
+
+
+def test_token_factory_ids_are_accepted():
+    s = Settings.from_env({"CREWOPS_ADVISOR_MODEL_ID": "meta-llama/Meta-Llama-3.1-70B-Instruct"})
+    assert s.advisor_model_id == "meta-llama/Meta-Llama-3.1-70B-Instruct"
+
+
+def test_a_windows_env_file_with_a_byte_order_mark_reads_normally(tmp_path, private_environ):
+    env = tmp_path / ".env"
+    env.write_bytes("AWS_PROFILE=crewops\r\nCREWOPS_STAGE=demo\r\n".encode("utf-8-sig"))
+    assert load_env_file(env) == {"AWS_PROFILE": "crewops", "CREWOPS_STAGE": "demo"}
+
+
+def test_the_nebius_key_stays_out_of_the_deploy_environment(tmp_path, private_environ):
+    private_environ.pop("NEBIUS_API_KEY", None)
+    private_environ.pop("CREWOPS_NEBIUS_API_KEY", None)
+    env = tmp_path / ".env"
+    env.write_text("AWS_PROFILE=crewops\nNEBIUS_API_KEY=nb-secret\nCREWOPS_NEBIUS_API_KEY=nb-2\n")
+    exports = shell_exports(env)
+    assert "nb-secret" not in exports and "nb-2" not in exports
+    assert "export AWS_PROFILE=crewops" in exports.splitlines()
+
+
+def test_env_example_loads_as_documented(private_environ):
+    """Copying .env.example to .env must give working settings, not a config error."""
+    from pathlib import Path
+
+    example = Path(__file__).resolve().parents[1] / ".env.example"
+    load_env_file(example)
+    s = Settings.from_env()
+    assert s.stage == "dev" and s.guardrails_enabled is False

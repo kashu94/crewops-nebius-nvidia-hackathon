@@ -46,9 +46,9 @@ def recipients(record: dict[str, Any], links: list[dict[str, Any]]) -> list[dict
     if change is None or change.report_type == "planned_leave":
         return []  # leave is re-crewed weeks ahead, nothing urgent
     allowed = [link for link in links if link.get("notifications") and link.get("username")]
-    if change.after == "SUBMITTED":
+    if change.after in ("SUBMITTED", "RESOLVING"):
         return [link for link in allowed if "approver" in (link.get("roles") or [])]
-    if change.after == "OPTIONS_READY" and change.before in ("REPORTED", "SUBMITTED"):
+    if change.after == "OPTIONS_READY" and change.before in ("REPORTED", "SUBMITTED", "RESOLVING"):
         desk = desk_of(record)
         return [
             link
@@ -94,6 +94,10 @@ def announcement(record: dict[str, Any]) -> str | None:
         what = f"{change.report_type.replace('_', ' ')}, {change.disruption_id}"
     if change.after == "SUBMITTED":
         text = f"CrewOps: a plan for {what} is waiting for your approval."
+    elif change.after == "RESOLVING":
+        text = f"CrewOps: {what} was resolved and is waiting for your sign-off."
+    elif change.before == "RESOLVING":
+        text = f"CrewOps: the resolution of {what} was sent back to your desk."
     elif change.before == "SUBMITTED":
         text = f"CrewOps: the plan for {what} was sent back to your desk."
     else:

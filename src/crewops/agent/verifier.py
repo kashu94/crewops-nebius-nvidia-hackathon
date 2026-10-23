@@ -47,6 +47,11 @@ ID_PATTERNS = (
     DATE_RE,
     CLOCK_RE,
 )
+LOOSE_ID_RE = re.compile(
+    r"\b(?:([cp])-?(\d{4})|(dx|ks|ng)[ -]?(\d{3})|(vt)-?([a-z]{3}))\b(?!-\d)", re.I
+)
+"""An id written loosely ("c-9999", "C9999", "dx 999"). The patterns above miss it, and so
+does the number check, so it is read as the id it spells and checked like one."""
 DURATION_RE = re.compile(r"(?<![\w.])(\d+)h(\d{2})m\b")
 """"1h20m" is one claim, in hours."""
 NUMBER_RE = re.compile(
@@ -83,12 +88,13 @@ PASS_WORDS_RE = re.compile(
 NEGATION_RE = re.compile(r"\b(?:not|no|never|without|cannot)\b|n't\b", re.I)
 CLAUSE_RE = re.compile(r"[^.;!?\n]+")
 LEGAL_CLAIM_RE = re.compile(
-    r"\b(C-\d{4})\b([^.;!?\n]{0,80}?)\b(legal|illegal|legally|cleared|cover|take|fly|operate)\b"
-    r"(?!\s+(?:option|choice))",
+    r"\b(C-\d{4})\b([^.;!?\n]{0,80}?)\b(legal|illegal|legally|cleared|cover|take|fly|operate"
+    r"|breach\w*|violat\w*|exceed\w*|fails|passes)\b(?!\s+(?:option|choice))",
     re.I,
 )
 """A crew id followed, in the same clause, by a verdict such as "is legal", "is not legal",
-"is cleared to", "can cover" or "cannot take"."""
+"is cleared to", "can cover", "cannot take", "would breach" or "passes every rule"."""
+FAIL_VERDICT = ("illegal", "breach", "violat", "exceed", "fails")
 MODAL_RE = re.compile(r"\b(cannot|can[’']t|unable to|able to|could|can|may)\b", re.I)
 """Longest first, or "can't" matches as "can"."""
 RANK_SURNAME_RE = re.compile(
@@ -188,6 +194,20 @@ def _ids(text: str) -> list[str]:
     out = list(stamped)
     for pattern in ID_PATTERNS:
         out += pattern.findall(rest)
+    return out
+
+
+def _loose_ids(text: str) -> list[str]:
+    out = []
+    for m in LOOSE_ID_RE.finditer(text):
+        if m.group(1):
+            canonical = f"{m.group(1).upper()}-{m.group(2)}"
+        elif m.group(3):
+            canonical = f"{m.group(3).upper()}{m.group(4)}"
+        else:
+            canonical = f"VT-{m.group(6).upper()}"
+        if m.group() != canonical:
+            out.append(canonical)
     return out
 
 
@@ -439,7 +459,7 @@ def _legality(text: str, ev: Evidence) -> list[Claim]:
                 claimed = not re.search(r"cannot|can[’']t|unable", modal.group(), re.I)
                 claimed = claimed != bool(re.search(r"\bnot\b", mid[modal.end() :], re.I))
             else:
-                claimed = (word != "illegal") != bool(NEGATION_RE.search(mid))
+                claimed = (not word.startswith(FAIL_VERDICT)) != bool(NEGATION_RE.search(mid))
             if claimed not in ev.legal.get(crew_id, set()):
                 out.append(Claim("legality", f"{crew_id} {'legal' if claimed else 'not legal'}"))
     return out
@@ -584,7 +604,7 @@ def verify(text: str, trace: Sequence[TraceEntry]) -> Verification:
     trace = list(trace)
     ev = build_evidence(trace)
     claims: list[Claim] = []
-    for value in dict.fromkeys(_ids(text)):
+    for value in dict.fromkeys(_ids(text) + _loose_ids(text)):
         source = ev.has_id(value)
         claims.append(Claim("identifier", value, source is not None, source))
     for raw, value in dict.fromkeys(numbers_in(text)):

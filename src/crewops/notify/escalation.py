@@ -113,10 +113,10 @@ def check(
     # Write the audit event before emailing. If SNS fails and Lambda retries, the retry sees
     # ESCALATED and stops, so the supervisor never gets two emails.
     at = _iso(now)
+    key = {"pk": f"DISRUPTION#{disruption_id}", "sk": f"AUDIT#{at}#ESCALATED#"}
     table.put_item(
         Item={
-            "pk": f"DISRUPTION#{disruption_id}",
-            "sk": f"AUDIT#{at}#ESCALATED#",
+            **key,
             "entity": "audit_event",
             "disruption_id": disruption_id,
             "action": "ESCALATED",
@@ -125,16 +125,22 @@ def check(
             "reason": f"untouched for {minutes} minutes on {on_desk}",
         }
     )
-    publish(
-        Alert(
-            AUDIENCE,
-            f"CrewOps: escalated, {disruption_id} untouched for {minutes} minutes"[:100],
-            f"Disruption {disruption_id} ({what}) has waited {minutes} minutes on {on_desk} "
-            "with no plan submitted. Check the desk is staffed, or plan it from another desk."
-            "\n\nYou receive this because a CrewOps administrator subscribed this address to "
-            "duty supervisor escalations.",
+    try:
+        publish(
+            Alert(
+                AUDIENCE,
+                f"CrewOps: escalated, {disruption_id} untouched for {minutes} minutes"[:100],
+                f"Disruption {disruption_id} ({what}) has waited {minutes} minutes on "
+                f"{on_desk} with no plan submitted. Check the desk is staffed, or plan it "
+                "from another desk.\n\nYou receive this because a CrewOps administrator "
+                "subscribed this address to duty supervisor escalations.",
+            )
         )
-    )
+    except Exception:
+        # Not sent: take the mark back so the retry escalates, instead of finding it and
+        # stopping with the supervisor never told.
+        table.delete_item(Key=key)
+        raise
     return "escalated"
 
 

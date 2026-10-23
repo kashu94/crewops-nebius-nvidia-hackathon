@@ -23,14 +23,18 @@ from typing import Any
 from crewops.agent import injection
 from crewops.agent.breaker import CircuitOpen
 from crewops.agent.context import Turn, as_reply, carry_ids
+from crewops.agent.crew_self import crew_self, with_next_trip
 from crewops.agent.entities import Vocabulary, extract, spoken_ids
 from crewops.agent.intents import Intent, Tier
 from crewops.agent.pii import redact, redact_text
 from crewops.agent.planner import MISSING, ToolCall, false_premise, followup_calls, seed_calls
 from crewops.agent.render import render
+from crewops.agent.roles_help import about_roles, help_for
 from crewops.agent.router import Route, Router, route_by_rules
+from crewops.agent.rule_topics import ALL, rule_topic
 from crewops.agent.smalltalk import small_talk
 from crewops.agent.verifier import Verification, keeps_every_fact, verify
+from crewops.domain import Role
 from crewops.tools import Caller, CrewOpsTools, TraceEntry, allowed_tools, dispatch
 from crewops.tools.dispatch import own_records
 from crewops.tools.errors import AMBIGUOUS_QUERY, NEEDS_CONFIRMATION
@@ -39,6 +43,14 @@ log = logging.getLogger(__name__)
 
 MAX_QUESTION = 1000
 FIRST_PERSON_RE = re.compile(r"\b(I|me|my|mine)\b", re.I)
+QUEUE_RE = re.compile(
+    r"\b(waiting (for|on) (me|my (approval|sign[- ]?off))|pending approvals?|"
+    r"(plans?|anything|something|resolutions?) (for me )?to (approve|sign off)|"
+    r"my (queue|approvals)|"
+    r"what('s| is) waiting|what should i (do|work on|look at|pick up)( next| now| first)?|"
+    r"what('s| is) next|where (do|should) i start|what needs my attention)\b",
+    re.I,
+)
 MY_DESK_RE = re.compile(r"\b(my desk|my disruptions|on my plate|assigned to me|for me)\b", re.I)
 SCOPE = (
     "I can help with crew control: rosters and reserves, duty hours, legality, cover for "
@@ -46,6 +58,7 @@ SCOPE = (
     "like to check?"
 )
 MAX_FOLLOWUP_ROUNDS = 3
+CREW_CONTROL = frozenset({Role.CONTROLLER, Role.APPROVER, Role.AUDITOR})
 ABOUT_A_CREW_MEMBER = frozenset(
     {
         Intent.LOOKUP_CERT,
@@ -174,6 +187,25 @@ class Pipeline:
 
         if chat := small_talk(question, caller, self.tools.world):
             return Answer(question, chat, None, source="smalltalk")
+        if roles := about_roles(question, caller):
+            # About the assistant or the roles, from the caller's verified roles.
+            return Answer(question, roles, None, source="smalltalk")
+        if topic := rule_topic(question):
+            if topic == ALL:
+                rules = self.tools.rules.values()
+                text = f"Every cover is checked against {len(rules)} rules. " + " ".join(
+                    f"{r.rule_id}: {r.text}" for r in rules
+                )
+                return Answer(question, text, None, source="template")
+            # "what's the FDP limit": the rule itself, in its current wording
+            question = f"explain {topic}"
+        question = with_next_trip(question, caller, self.tools.world)
+        if caller.crew_id and (own := crew_self(question, caller, self.tools.world)):
+            # A crew member's question about themselves: their own roster, nobody else's.
+            return Answer(question, own, None, source="template")
+
+        if queue := self._queue(question, caller):
+            return queue
 
         context_notes: list[str] = []
         reply = previous is not None and previous.awaiting == "detail"
@@ -283,7 +315,7 @@ class Pipeline:
         if not trace:
             return Answer(
                 question,
-                self._nothing_ran(route, planned, allowed),
+                self._nothing_ran(route, planned, allowed, caller),
                 route,
                 source="clarify",
                 awaiting="detail",
@@ -372,17 +404,76 @@ class Pipeline:
             "or Cabin Crew? Or tell me who is out."
         )
 
-    def _nothing_ran(self, route: Route, planned: list[ToolCall], allowed: frozenset[str]) -> str:
+    def _queue(self, question: str, caller: Caller) -> Answer | None:
+        """ "What's waiting for me?": an approver's sign-offs, or what on a controller's desk
+        still needs a plan. Read from the live store like any open-disruption question."""
+        approver = Role.APPROVER in caller.roles
+        controller = Role.CONTROLLER in caller.roles and caller.desk
+        if not (approver or controller) or not QUEUE_RE.search(question):
+            return None
+        call = ToolCall("list_open_disruptions", {} if approver else {"desk": caller.desk})
+        notes: list[str] = []
+        trace = self._run([call], caller, allowed_tools(caller), notes)
+        entry = trace[0] if trace else None
+        if entry is None or not entry.ok:
+            text = entry.error if entry and entry.error else "I couldn't read the open disruptions."
+            return Answer(question, text, None, source="template", trace=trace, notes=notes)
+        rows = entry.result["disruptions"]
+
+        def line(d: dict[str, Any]) -> str:
+            return f"{d['disruption_id']}, {d['what']}"
+
+        if approver:
+            plans = [line(d) for d in rows if d["status"] == "SUBMITTED"]
+            closes = [line(d) for d in rows if d["status"] == "RESOLVING"]
+            parts = []
+            if plans:
+                parts.append(
+                    f"{len(plans)} plan{'s' if len(plans) != 1 else ''} to approve: "
+                    + "; ".join(plans[:5])
+                )
+            if closes:
+                parts.append(
+                    f"{len(closes)} resolution{'s' if len(closes) != 1 else ''} to sign off: "
+                    + "; ".join(closes[:5])
+                )
+            text = (
+                ". ".join(parts) + "."
+                if parts
+                else "Nothing is waiting for your approval right now."
+            )
+        else:
+            todo = [line(d) for d in rows if d["status"] in ("REPORTED", "OPTIONS_READY")]
+            waiting = [line(d) for d in rows if d["status"] in ("SUBMITTED", "RESOLVING")]
+            parts = []
+            if todo:
+                parts.append(
+                    f"{len(todo)} on {caller.desk} need{'s' if len(todo) == 1 else ''} a plan: "
+                    + "; ".join(todo[:5])
+                )
+            if waiting:
+                parts.append(f"{len(waiting)} with an approver: " + "; ".join(waiting[:5]))
+            text = ". ".join(parts) + "." if parts else f"Nothing open on {caller.desk} right now."
+        return Answer(question, text, None, source="template", trace=trace, notes=notes)
+
+    def _nothing_ran(
+        self, route: Route, planned: list[ToolCall], allowed: frozenset[str], caller: Caller
+    ) -> str:
         """Never return empty here. Silence would sound like "all clear"."""
         if planned and not allowed & {c.name for c in planned}:
-            return "Your role doesn't give access to that information."
+            return f"Your role doesn't give access to that information. {help_for(caller)}"
         ents = route.entities
         if (
             route.decided_by == "default"
             and not planned
             and not (ents.crew_ids or ents.pairing_ids or ents.flight_ids)
         ):
-            return SCOPE
+            # crew control's own scope; anyone else hears what their role can ask
+            return (
+                SCOPE
+                if caller.roles & CREW_CONTROL
+                else f"I can't help with that. {help_for(caller)}"
+            )
         if seat := self._which_seat(route):
             return seat
         what = route.intent.value.replace("_", " ").lower()

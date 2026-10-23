@@ -15,6 +15,7 @@ Entities always come from this question's own text, whichever stage picked the i
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -32,6 +33,8 @@ from crewops.agent.entities import (
     extract,
 )
 from crewops.agent.intents import Confidence, Intent, Tier
+
+log = logging.getLogger(__name__)
 
 NOT_ABOUT_ONE = r"^(?!.*\b(?:impact|affect|effect|cover|replace|legal|cancel|risk)\w*).*?"
 """Prefix that stops a rule from taking a question about one disruption's effect or cover."""
@@ -423,7 +426,13 @@ class Router:
     def _semantic(self, text: str, ents: Entities) -> Route | None:
         if self.search is None or is_bare_identifier(text):
             return None
-        hits = list(self.search(text))
+        try:
+            hits = list(self.search(text))
+        except Exception:
+            # Embeddings or the index unreachable (or models paused): triage or a lookup
+            # answers instead, as when nothing is similar enough.
+            log.exception("semantic search failed; falling through")
+            return None
         if not hits:
             return None
         best = hits[0]

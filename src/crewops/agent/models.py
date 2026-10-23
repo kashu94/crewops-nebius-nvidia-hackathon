@@ -174,7 +174,8 @@ class ModelAdvisor:
 
         while True:
             # check before calling, not after: no paying for a reply we'd throw away
-            if time.monotonic() > deadline:
+            left = deadline - time.monotonic()
+            if left <= 0:
                 self.last.stop = "budget"
                 return ""
             response = self.client.converse(
@@ -182,6 +183,7 @@ class ModelAdvisor:
                 system=system,
                 messages=messages,
                 inferenceConfig={"maxTokens": self.max_tokens, "temperature": 0},
+                timeout=left,  # a later round gets only the time that is left
                 **config,
             )
             self.last.usage.add(response)

@@ -98,3 +98,18 @@ def test_objects_outside_uploads_are_ignored(env):
 
 def test_result_key():
     assert roster_upload.result_key("uploads/a/b.json") == "results/a/b.json.result.json"
+
+
+def test_moving_a_flight_to_another_gate_leaves_one_slot(env):
+    s3, store = env
+    slots = json.loads((default_seed_dir() / "boarding_gates.json").read_text())
+    slot = next(g for g in slots if g["flight_id"] == "DX403-2026-10-13")
+    assert slot["boarding_gate_number"] == "BLR-G1"
+    moved = {**slot, "boarding_gate_number": "BLR-G6"}
+    event = upload(s3, "uploads/gate.json", json.dumps({"boarding_gates": [moved]}).encode())
+
+    out = roster_upload.handler(event)
+
+    assert out["processed"][0]["status"] == "accepted"
+    held = [g.gate for g in store.load_seed().gates if g.flight_id == "DX403-2026-10-13"]
+    assert held == ["BLR-G6"]

@@ -33,6 +33,16 @@ def message(record: dict[str, Any]) -> dict[str, Any] | None:
             "Plan waiting for approval",
             f"{change.disruption_id} ({what}) has a plan to approve.",
         )
+    elif change.after == "RESOLVING":
+        title, body = (
+            "Waiting for sign-off",
+            f"{change.disruption_id} ({what}) was resolved; sign it off.",
+        )
+    elif change.before == "RESOLVING":
+        title, body = (
+            "Resolution sent back",
+            f"{change.disruption_id} ({what}) is back on your desk.",
+        )
     elif change.before == "SUBMITTED":
         title, body = "Plan sent back", f"{change.disruption_id} ({what}) needs another plan."
     else:

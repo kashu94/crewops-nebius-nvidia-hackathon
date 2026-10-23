@@ -10,6 +10,7 @@ yet" rather than a guardrail called ''.
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from collections.abc import Mapping
@@ -42,7 +43,7 @@ class ConfigError(ValueError):
     """Setting is present but unusable."""
 
 
-ENV_LINE_RE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
+ENV_LINE_RE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 
 
 def _parse_value(value: str, where: str) -> str:
@@ -71,7 +72,8 @@ def load_env_file(path: str | os.PathLike[str] = ".env", override: bool = False)
     """
     applied: dict[str, str] = {}
     try:
-        with open(path, encoding="utf-8") as fh:
+        # utf-8-sig: a .env saved on Windows with a byte-order mark reads like any other
+        with open(path, encoding="utf-8-sig") as fh:
             lines = fh.readlines()
     except FileNotFoundError:
         return applied
@@ -83,7 +85,9 @@ def load_env_file(path: str | os.PathLike[str] = ".env", override: bool = False)
         match = ENV_LINE_RE.match(line)
         if not match:
             raise ConfigError(f"{path}:{number}: expected KEY=VALUE, got {line!r}")
-        key, value = match.group(1), _parse_value(match.group(2).strip(), f"{path}:{number}")
+        key, rest = match.group(1), match.group(2)
+        # "A=   # note" is empty, as in a shell: "#" after a space starts a comment
+        value = "" if re.match(r"\s+#", rest) else _parse_value(rest.strip(), f"{path}:{number}")
         if override or key not in os.environ:
             os.environ[key] = value
             applied[key] = value
@@ -118,6 +122,8 @@ def _float(env: Mapping[str, str], key: str, default: float) -> float:
         value = float(raw)
     except ValueError:
         raise ConfigError(f"{key} must be a number, got {raw!r}") from None
+    if not math.isfinite(value):
+        raise ConfigError(f"{key} must be a finite number, got {raw!r}")
     if value <= 0:
         raise ConfigError(f"{key} must be > 0, got {value}")
     return value
@@ -163,6 +169,25 @@ def _events_stage(env: Mapping[str, str]) -> str:
     if stage not in ("development", "live"):
         raise ConfigError(f"CREWOPS_ALEXA_EVENTS_STAGE must be development or live, got {stage!r}")
     return stage
+
+
+BEDROCK_MODEL_RE = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+(:[0-9]+)?$")
+"""A Bedrock model id: ``provider.model`` with no ``/``, sometimes with a region prefix and
+a ``:version`` (``amazon.nova-micro-v1:0``, ``global.amazon.nova-2-lite-v1:0``). Token
+Factory ids have an owner and a ``/``: ``nvidia/Llama-3.1-Nemotron-70B-Instruct-HF``."""
+
+
+def _chat_model(env: Mapping[str, str], key: str, default: str) -> str:
+    """A chat role's model: a Nebius Token Factory id. A Bedrock id left over in ``.env``
+    would be sent to Token Factory, refused, and quietly leave every answer to the
+    templates, so it is stopped here."""
+    model = _get(env, key, default)
+    if BEDROCK_MODEL_RE.match(model):
+        raise ConfigError(
+            f"{key}={model!r} is a Bedrock model id, but the chat roles run on Nebius Token "
+            f"Factory: use a Token Factory id such as {default!r}, or remove the line"
+        )
+    return model
 
 
 def _base_url(env: Mapping[str, str]) -> str:
@@ -358,9 +383,11 @@ class Settings:
         return cls(
             stage=stage,
             aws_region=_get(env, "AWS_REGION") or _get(env, "AWS_DEFAULT_REGION", DEFAULT_REGION),
-            router_model_id=_get(env, "CREWOPS_ROUTER_MODEL_ID", DEFAULT_ROUTER_MODEL),
-            advisor_model_id=_get(env, "CREWOPS_ADVISOR_MODEL_ID", DEFAULT_ADVISOR_MODEL),
-            explainer_model_id=_get(env, "CREWOPS_EXPLAINER_MODEL_ID", DEFAULT_EXPLAINER_MODEL),
+            router_model_id=_chat_model(env, "CREWOPS_ROUTER_MODEL_ID", DEFAULT_ROUTER_MODEL),
+            advisor_model_id=_chat_model(env, "CREWOPS_ADVISOR_MODEL_ID", DEFAULT_ADVISOR_MODEL),
+            explainer_model_id=_chat_model(
+                env, "CREWOPS_EXPLAINER_MODEL_ID", DEFAULT_EXPLAINER_MODEL
+            ),
             embedding_model_id=_get(env, "CREWOPS_EMBEDDING_MODEL_ID", DEFAULT_EMBEDDING_MODEL),
             embedding_dimensions=dims,
             guardrail_id=_get(env, "CREWOPS_GUARDRAIL_ID"),
@@ -387,6 +414,10 @@ class Settings:
         )
 
 
+SECRET_ENV = frozenset({"NEBIUS_API_KEY", "CREWOPS_NEBIUS_API_KEY"})
+"""``.env`` values for local runs only, never passed on to other tools."""
+
+
 def shell_exports(path: str | os.PathLike[str] = ".env") -> str:
     """``export`` lines with the ``.env`` values plus resolved region and stage.
     ``scripts/cdk.sh`` evals this so the shell and Python share one ``.env`` parser and
@@ -396,6 +427,9 @@ def shell_exports(path: str | os.PathLike[str] = ".env") -> str:
 
     applied = load_env_file(path)
     settings = Settings.from_env()
+    # Deploying never needs the Token Factory key (the services read Parameter Store), so it
+    # is kept out of the deploy tools' environment.
+    applied = {k: v for k, v in applied.items() if k not in SECRET_ENV}
     values = {**applied, "AWS_REGION": settings.aws_region, "CREWOPS_STAGE": settings.stage}
     return "\n".join(f"export {key}={shlex.quote(value)}" for key, value in values.items())
 

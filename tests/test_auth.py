@@ -310,7 +310,11 @@ def test_reset_passwords(ops_table):
         cognito, POOL, ops_table, team, lambda: "Battery-Staple-7", reset_passwords=True
     )
     apply(plan)
-    assert set(cognito.passwords.values()) == {"Battery-Staple-7"} and plan.needs_password
+    speaker = next(m.username for m in team if Role.SPEAKER in m.roles)
+    people = {u: p for u, p in cognito.passwords.items() if u != speaker}
+    assert set(people.values()) == {"Battery-Staple-7"} and plan.needs_password
+    # the speaker keeps its own password: the hosted app and the TV sign in with it
+    assert cognito.passwords[speaker] == "Correct-Horse-9"
 
 
 def test_profile_never_holds_contact_details():

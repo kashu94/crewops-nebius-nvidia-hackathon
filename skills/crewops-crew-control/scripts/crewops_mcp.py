@@ -105,7 +105,38 @@ async def run(tool: str | None, arguments: dict[str, Any]) -> Any:
         return values[0] if len(values) == 1 else values
 
 
+def _failure(exc: BaseException) -> str:
+    """``CODE: message`` for a failure outside a tool result, so the agent sees the same shape
+    as a refusal (references/errors.md) instead of a stack trace."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:  # from the HTTP transport
+        exc = exc.exceptions[0]
+    if isinstance(exc, json.JSONDecodeError):
+        return f"INVALID: the arguments are not valid JSON ({exc.msg})"
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):  # botocore ClientError from the Cognito sign-in
+        code = response.get("Error", {}).get("Code", "")
+        if code in ("NotAuthorizedException", "UserNotFoundException"):
+            return "UNAUTHORIZED: wrong username or password"
+        return f"UNAVAILABLE: sign-in failed ({code or type(exc).__name__})"
+    status = getattr(response, "status_code", None)  # httpx.HTTPStatusError from the server
+    if status in (401, 403):
+        return "UNAUTHORIZED: the access token was refused (expired?); sign in again"
+    if status is not None:
+        return f"UNAVAILABLE: the server answered HTTP {status}"
+    return f"UNAVAILABLE: {type(exc).__name__}: {exc}"
+
+
 def main(argv: list[str]) -> int:
+    try:
+        return _main(argv)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as exc:
+        print(json.dumps({"error": _failure(exc)}, indent=2, ensure_ascii=False))
+        return 1
+
+
+def _main(argv: list[str]) -> int:
     if argv[:1] == ["url"]:
         print(server_url())
         return 0

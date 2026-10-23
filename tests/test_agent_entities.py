@@ -99,3 +99,9 @@ def test_dates_review_cases():
     assert ents("Who may 3 captains replace?").dates == []
     assert ents("on 3 May").dates == ["2026-05-03"]
     assert ents("Report at 2026-10-14T08:30:00Z").dates == ["2026-10-14"]
+
+
+def test_currently_does_not_turn_tomorrow_into_today():
+    assert ents("Which flights are currently scheduled for tomorrow?").dates == ["2026-10-13"]
+    assert ents("Who is on reserve right now?").dates == ["2026-10-12"]
+    assert ents("today, not tomorrow").dates == ["2026-10-12"]

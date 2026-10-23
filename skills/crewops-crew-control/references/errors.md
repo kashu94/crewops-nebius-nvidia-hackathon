@@ -9,7 +9,7 @@ unchanged, and never try a different tool to get round one.
 | `UNAUTHORIZED` | The sign-in token is missing, expired or not from CrewOps | Ask the person to sign in again; never ask for their password in chat |
 | `FORBIDDEN` | Their role may not do this, or the disruption is not on their desk | Say who can (an approver, the owning desk, an admin). For another desk's seat, offer `suggest_cover` |
 | `NOT_FOUND` | No such disruption or plan that they may read | Check the id with them; ids look like `r-1a2b3c4d5e6f` and `pl-…` |
-| `INVALID` | A field is wrong: unknown crew id, bad date, dates outside today to two months ahead (leave: tomorrow to the end of the rostered period), a reason not on the list | Fix it with the person. For ids, `report_reference` or `crew_tool("suggest_crew_ids", …)`; confirm before using a suggestion |
+| `INVALID` | A field is wrong: unknown crew id, bad date, dates outside today to two months ahead (leave: tomorrow to the end of the rostered period), a reason not on the list | Fix it with the person. For ids, `report_reference`, or (crew control) `crew_tool("suggest_crew_ids", …)`; confirm before using a suggestion |
 | `DUPLICATE` | Those days are already reported for that person | Point to the existing report (`my_reports`); extend it with a new report for the extra days only |
 | `WRONG_STATE` | The disruption or plan is not in the state the action needs (already submitted, already decided, already closed) | `show_disruption` to see where it stands, and say so |
 | `FOUR_EYES` | An approver tried to approve a plan they submitted | A different approver must decide it. Never look for a way round |
@@ -34,3 +34,19 @@ unchanged, and never try a different tool to get round one.
 - `report_disruption` returns status `queued`: accepted for checking. It is not yet a
   disruption: follow it with `my_reports`, which shows it refused (with the reason) or
   analysed.
+
+## `crew_tool` results
+
+`crew_tool` runs one deterministic tool and always returns a result, never a tool error. A
+refusal is a result with `"ok": false`, an `error_code` and an `error` message:
+
+| `error_code` | When | What to do |
+|---|---|---|
+| `UNRESOLVED_ENTITY` | An id or name matches nothing real | Say so, with the nearest real ids in the message; never construct an id |
+| `NEEDS_CONFIRMATION` | A near match ("did you mean C-1042?") | Ask the person; never pick for them |
+| `AMBIGUOUS_QUERY` | Several matches, or a seat or date is missing | Ask which one; never pick for them |
+| `INVALID_ARGUMENT` | An argument is out of range or malformed | Fix it with the person |
+| `ALREADY_STARTED` | The trip has started and can no longer be re-crewed | Say so; nothing to plan |
+| `FORBIDDEN` | Their role may not use that tool | Say who can |
+| `UNAVAILABLE` | The operation could not be read just now | Try once more later; otherwise say it is unavailable |
+| `INTERNAL` | A fault in CrewOps; it is logged | Say it failed; do not retry the same call |

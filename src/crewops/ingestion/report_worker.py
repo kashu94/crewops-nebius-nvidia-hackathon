@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 
 from crewops.config import Settings
 from crewops.domain import DataError
@@ -82,12 +82,26 @@ def check_references(table: Any, report: Report) -> str | None:
         table, f"FLIGHT{S}{d['flight_id']}", "META"
     ):
         return f"unknown flight {d['flight_id']}"
-    if kind is ReportType.GATE_CLOSURE:
-        found = table.query(
-            KeyConditionExpression=Key(schema.PK).eq(f"GATE{S}{d['gate']}"), Limit=1
-        )
+    if kind in (ReportType.GATE_CLOSURE, ReportType.GATE_CHANGE):
+        gate = d["gate"] if kind is ReportType.GATE_CLOSURE else d["new_gate"]
+        found = table.query(KeyConditionExpression=Key(schema.PK).eq(f"GATE{S}{gate}"), Limit=1)
         if not found.get("Items"):
-            return f"unknown gate {d['gate']}"
+            return f"unknown gate {gate}"
+    if kind is ReportType.GATE_CHANGE:
+        flight = table.get_item(
+            Key={schema.PK: f"FLIGHT{S}{d['flight_id']}", schema.SK: "META"},
+            ProjectionExpression="dep_station",
+        ).get("Item", {})
+        station = d["new_gate"].split("-")[0]
+        if flight.get("dep_station") and flight["dep_station"] != station:
+            return f"{d['new_gate']} is not at {d['flight_id']}'s departure station"
+        already = table.query(
+            KeyConditionExpression=Key(schema.PK).eq(f"GATE{S}{d['new_gate']}")
+            & Key(schema.SK).begins_with(f"SLOT{S}"),
+            FilterExpression=Attr("flight_id").eq(d["flight_id"]),
+        )
+        if already.get("Items"):
+            return f"{d['flight_id']} already boards at {d['new_gate']}"
     if kind is ReportType.AIRCRAFT_TECHNICAL:
         found = table.query(
             IndexName=schema.GSI1,

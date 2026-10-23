@@ -196,3 +196,10 @@ def test_did_you_mean_hints_only_name_tools_the_caller_may_use(tools):
     r = call(tools, "duty_clock", me, crew_id="C-10")
     assert r.error_code == "UNRESOLVED_ENTITY" and "suggest_crew_ids" not in r.error
     assert "suggest_crew_ids" in call(tools, "duty_clock", crew_id="C-10").error
+
+
+def test_a_number_that_is_not_finite_is_refused(tools):
+    r = dispatch(
+        tools, CONTROLLER, "check_legality", {"crew_id": "C-1042", "delay_h": float("nan")}
+    )
+    assert not r.ok and "finite" in r.error, r.error

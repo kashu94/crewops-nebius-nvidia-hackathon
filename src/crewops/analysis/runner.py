@@ -34,7 +34,7 @@ from crewops.store.reports import (
 
 log = logging.getLogger(__name__)
 
-OPEN_STATUSES = (STATUS_REPORTED, STATUS_OPTIONS_READY, "SUBMITTED")
+OPEN_STATUSES = (STATUS_REPORTED, STATUS_OPTIONS_READY, "SUBMITTED", "RESOLVING")
 """Still being worked; these count against a controller's desk."""
 UNAVAILABLE_STATUSES = (*OPEN_STATUSES, "COMMITTED", "CLOSED")
 """Disruptions whose crew are out on their dates. Committed and closed ones count too, since
@@ -43,7 +43,7 @@ the person is still sick (or still lacks the certificate) whatever was done abou
 
 def absences_from(items: list[dict[str, Any]]) -> dict[tuple[str, date], datetime]:
     """(crew id, date) -> start time of a part-day absence. A whole-day absence for the same
-    person and date wins."""
+    person and date wins, including any day of a longer absence, not only its first."""
     since: dict[tuple[str, date], datetime | None] = {}
     for item in items:
         try:
@@ -53,18 +53,21 @@ def absences_from(items: list[dict[str, Any]]) -> dict[tuple[str, date], datetim
         if report.report_type not in ABSENCE_TYPES:
             continue
         d = report.details
-        first = date.fromisoformat(d["from_date"])
+        first, last = date.fromisoformat(d["from_date"]), date.fromisoformat(d["to_date"])
         at = (
             datetime.fromisoformat(d["from_utc"].replace("Z", "+00:00"))
             if d.get("from_utc")
             else None
         )
+        days = [first + timedelta(days=i) for i in range((last - first).days + 1)]
         for crew_id in crew_out_of(report.report_type, d):
-            key = (crew_id, first)
-            if at is None or key in since and since[key] is None:
-                since[key] = None
-            else:
-                since[key] = min(at, since.get(key) or at)
+            for day in days:
+                key = (crew_id, day)
+                part = at if day == first else None
+                if part is None or key in since and since[key] is None:
+                    since[key] = None
+                else:
+                    since[key] = min(part, since.get(key) or part)
     return {k: v for k, v in since.items() if v is not None}
 
 

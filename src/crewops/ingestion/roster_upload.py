@@ -14,13 +14,17 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from typing import Any
 from urllib.parse import unquote_plus
 
 import boto3
 
 from crewops.config import Settings
+from crewops.domain import GateSlot
 from crewops.ingestion.roster import MAX_UPLOAD_BYTES, IngestResult, Status, ingest
+from crewops.store import schema
+from crewops.store.items import to_item
 
 UPLOADS_PREFIX = "uploads/"
 RESULTS_PREFIX = "results/"
@@ -33,6 +37,27 @@ def result_key(upload_key: str) -> str:
     return f"{RESULTS_PREFIX}{upload_key.removeprefix(UPLOADS_PREFIX)}.result.json"
 
 
+def _key(record: Any) -> dict[str, str]:
+    item = to_item(record)
+    return {schema.PK: item[schema.PK], schema.SK: item[schema.SK]}
+
+
+def _replaced_slots(current: Iterable[GateSlot], records: Iterable[Any]) -> list[GateSlot]:
+    """Slots an upload replaces under a different key. There is one slot per flight, but it
+    is stored under its gate and start time, so moving a flight to another gate or time
+    would otherwise leave the old slot behind and the flight would hold two gates."""
+    uploaded = [r for r in records if isinstance(r, GateSlot)]
+    flights = {r.flight_id for r in uploaded}
+    keep = {tuple(_key(r).values()) for r in uploaded}
+    return [g for g in current if g.flight_id in flights and tuple(_key(g).values()) not in keep]
+
+
+def _delete(store: Any, slots: Iterable[GateSlot]) -> None:
+    with store.table.batch_writer() as batch:
+        for g in slots:
+            batch.delete_item(Key=_key(g))
+
+
 def process(s3: Any, store: Any, bucket: str, key: str) -> IngestResult:
     size = s3.head_object(Bucket=bucket, Key=key)["ContentLength"]
     if size > MAX_UPLOAD_BYTES:
@@ -43,13 +68,17 @@ def process(s3: Any, store: Any, bucket: str, key: str) -> IngestResult:
             errors=(f"upload is {size} bytes; the limit is {MAX_UPLOAD_BYTES}",),
         )
         records: list[Any] = []
+        stale: list[GateSlot] = []
     else:
         raw = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-        result, records = ingest(raw, store.load_seed(), key)
+        base = store.load_seed()
+        result, records = ingest(raw, base, key)
+        stale = _replaced_slots(base.gates, records)
 
     if result.status is Status.ACCEPTED:
         written = store.put_records(records)
-        log.info("accepted %s: wrote %s", key, dict(written))
+        _delete(store, stale)
+        log.info("accepted %s: wrote %s, moved %d gate slot(s)", key, dict(written), len(stale))
     else:
         log.warning("rejected %s: %s", key, "; ".join(result.errors))
 

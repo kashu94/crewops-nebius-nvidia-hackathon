@@ -16,9 +16,11 @@ and one POST is all a role needs.
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -109,6 +111,39 @@ def to_chat_messages(
         text = _text(blocks)
         if text:
             out.append({"role": "user", "content": text})
+    return _one_call_per_turn(out)
+
+
+def _one_call_per_turn(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Llama 3.1 chat templates (Nemotron 70B's among them) refuse an assistant turn with more
+    than one tool call. Such a turn and the results after it become alternating single-call
+    assistant turns, each followed by its own result."""
+    out: list[dict[str, Any]] = []
+    i = 0
+    while i < len(messages):
+        message = messages[i]
+        calls = message.get("tool_calls") or []
+        if message["role"] != "assistant" or len(calls) < 2:
+            out.append(message)
+            i += 1
+            continue
+        j = i + 1
+        results = {}
+        while j < len(messages) and messages[j]["role"] == "tool":
+            results[messages[j]["tool_call_id"]] = messages[j]
+            j += 1
+        for n, call in enumerate(calls):
+            out.append(
+                {
+                    "role": "assistant",
+                    "content": message.get("content") if n == 0 else None,
+                    "tool_calls": [call],
+                }
+            )
+            if call["id"] in results:
+                out.append(results.pop(call["id"]))
+        out.extend(results.values())  # results with no matching call, kept in order
+        i = j
     return out
 
 
@@ -164,7 +199,7 @@ def from_chat_response(response: Mapping[str, Any]) -> dict[str, Any]:
         content.append({"text": message["content"]})
     stop = STOP_REASONS.get(choice.get("finish_reason") or "", choice.get("finish_reason") or "")
     calls = message.get("tool_calls") or []
-    for call in calls:
+    for n, call in enumerate(calls):
         function = call.get("function") or {}
         try:
             args = json.loads(function.get("arguments") or "{}")
@@ -177,7 +212,7 @@ def from_chat_response(response: Mapping[str, Any]) -> dict[str, Any]:
         content.append(
             {
                 "toolUse": {
-                    "toolUseId": call.get("id") or "",
+                    "toolUseId": call.get("id") or f"call-{n}",
                     "name": function["name"],
                     "input": args,
                 }
@@ -229,15 +264,20 @@ class NebiusClient:
         system: list[dict[str, Any]] | None = None,
         inferenceConfig: Mapping[str, Any] | None = None,
         toolConfig: Mapping[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
-        """Converse's parameter names and shapes, so the roles need no change."""
+        """Converse's parameter names and shapes, so the roles need no change. ``timeout``
+        shortens this one call, for a caller with less time left than the client's default."""
         body = to_chat_request(modelId, system, messages, inferenceConfig, toolConfig)
-        return from_chat_response(self._request("POST", "chat/completions", body))
+        seconds = self.timeout if timeout is None else min(self.timeout, timeout)
+        return from_chat_response(self._request("POST", "chat/completions", body, seconds))
 
     def list_models(self) -> list[str]:
         return sorted(m["id"] for m in self._request("GET", "models").get("data", []))
 
-    def _request(self, method: str, path: str, body: Any = None) -> dict[str, Any]:
+    def _request(
+        self, method: str, path: str, body: Any = None, timeout: float | None = None
+    ) -> dict[str, Any]:
         request = urllib.request.Request(
             self.base_url + path,
             data=None if body is None else json.dumps(body).encode("utf-8"),
@@ -249,12 +289,19 @@ class NebiusClient:
             },
         )
         try:
-            with self._open(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+            with self._open(request, timeout=self.timeout if timeout is None else timeout) as r:
+                payload = r.read()
         except urllib.error.HTTPError as exc:
             raise NebiusError(exc.code, _error_message(exc)) from None
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+        except (OSError, http.client.HTTPException) as exc:
+            # URLError, timeouts, refused or dropped connections, TLS errors, a body cut off
+            # half way: the service did not answer.
             raise NebiusUnavailable(f"Nebius Token Factory unreachable: {exc}") from None
+        try:
+            return json.loads(payload.decode("utf-8"))
+        except ValueError:
+            # A 200 with a body that is not JSON (a proxy's error page, a cut-off reply).
+            raise NebiusError(502, "unreadable response") from None
 
 
 def _error_message(exc: urllib.error.HTTPError) -> str:
@@ -274,6 +321,19 @@ def _error_message(exc: urllib.error.HTTPError) -> str:
 # --------------------------------------------------------------------------
 
 
+_KEYS: dict[str, tuple[str, float]] = {}
+"""Last key read from each parameter, and when. Pipelines are rebuilt periodically; a
+Parameter Store hiccup during a rebuild must not turn the models off."""
+KEY_REUSE_SECONDS = 6 * 3600
+"""How long a key read earlier stands in when Parameter Store cannot be reached. A rotated
+key is picked up at the next successful read."""
+KEY_GONE = frozenset(
+    {"ParameterNotFound", "ParameterVersionNotFound", "AccessDeniedException", "InvalidKeyId"}
+)
+"""Answers that mean the key was removed or access withdrawn on purpose, not a hiccup: the
+models then stop, rather than run on a key nobody may read any more."""
+
+
 def api_key(parameter: str, region: str, env: Mapping[str, str] | None = None) -> str | None:
     """The Token Factory key: from the environment for a local run, else the SecureString
     ``parameter`` in Parameter Store, where the deployed services find it. ``None`` when
@@ -285,13 +345,25 @@ def api_key(parameter: str, region: str, env: Mapping[str, str] | None = None) -
             return value
     try:
         import boto3
+        from botocore.config import Config
 
-        ssm = boto3.Session(region_name=region).client("ssm")
+        ssm = boto3.Session(region_name=region).client(
+            "ssm",
+            config=Config(connect_timeout=2, read_timeout=3, retries={"max_attempts": 2}),
+        )
         value = ssm.get_parameter(Name=parameter, WithDecryption=True)["Parameter"]["Value"]
-    except Exception as exc:  # no parameter, no permission, no network: no models
-        log.warning("no Nebius API key (%s): answering without models", type(exc).__name__)
+    except Exception as exc:  # no parameter, no permission, no network
+        code = getattr(exc, "response", {}).get("Error", {}).get("Code") or type(exc).__name__
+        earlier = None if code in KEY_GONE else _KEYS.get(parameter)
+        if earlier and time.monotonic() - earlier[1] < KEY_REUSE_SECONDS:
+            log.warning("Nebius API key not re-read (%s): using the one read earlier", code)
+            return earlier[0]
+        log.warning("no Nebius API key (%s): answering without models", code)
         return None
-    return value.strip() or None
+    value = value.strip()
+    if value:
+        _KEYS[parameter] = (value, time.monotonic())
+    return value or None
 
 
 def main(argv: list[str] | None = None) -> int:

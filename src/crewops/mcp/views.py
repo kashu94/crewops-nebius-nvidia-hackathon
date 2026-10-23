@@ -19,7 +19,7 @@ from crewops.store import plans as plan_store
 from crewops.store.items import from_dynamo
 from crewops.store.reports import disruptions_with_status
 
-OPEN = ("REPORTED", "OPTIONS_READY", "SUBMITTED")
+OPEN = ("REPORTED", "OPTIONS_READY", "SUBMITTED", "RESOLVING")
 
 
 def near(ours: set[str], theirs: Iterable[str]) -> bool:

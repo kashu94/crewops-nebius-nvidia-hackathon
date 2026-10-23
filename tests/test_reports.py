@@ -34,7 +34,7 @@ VALID_DETAILS = {
         "to_utc": "2026-10-15T14:00:00Z",
         "reason": "weather",
     },
-    "gate_change": {"flight_id": "DX401-2026-10-13", "new_gate": "BLR-G4"},
+    "gate_change": {"flight_id": "DX401-2026-10-13", "new_gate": "BLR-G6"},
     "certification_lapse": {
         "crew_id": "C-5417",
         "cert_type": "recurrent_training",

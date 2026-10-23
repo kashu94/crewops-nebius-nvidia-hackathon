@@ -186,3 +186,12 @@ def test_planned_leave_does_not_chime_push_or_email_teams():
     rohit = {"username": "rohit", "roles": ["controller"], "desk": "desk-2", "notifications": True}
     assert recipients(record, [rohit]) == []  # no Echo chime, so no desktop push either
     assert team_alerts(record, change_of(record), "dev") == []
+
+
+def test_a_several_day_absence_read_on_its_second_day_still_flies_today():
+    from datetime import date
+
+    running = {"seats": [seat(dates=("2026-10-15", "2026-10-16"))]}
+    assert severity(running, "2026-10-14T05:00:00Z", date(2026, 10, 16))["reasons"] == [
+        "flies today"
+    ]

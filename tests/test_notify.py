@@ -333,3 +333,23 @@ def test_an_address_can_follow_an_operational_team(subscriptions):
     arn = f"{subscriptions.topic_arn}:{out['subscription_id']}"
     attrs = subscriptions.sns.get_subscription_attributes(SubscriptionArn=arn)["Attributes"]
     assert json.loads(attrs["FilterPolicy"]) == {"role": ["flight_info"]}
+
+
+def test_chimes_and_pushes_go_only_for_records_before_a_failed_one(moto_aws, monkeypatch):
+    """The failed record and everything after it come back on the retry; announcing them now
+    as well would chime twice."""
+    from crewops.alexa import notifier
+    from crewops.notify import stream_handler
+
+    monkeypatch.setenv("CREWOPS_ALEXA_SKILL_ID", "amzn1.ask.skill.test")
+    records = [record(disruption("OPTIONS_READY"), seq=s) for s in ("1", "2", "3")]
+    monkeypatch.setattr(
+        stream_handler,
+        "process",
+        lambda *a, **k: {"batchItemFailures": [{"itemIdentifier": "2"}]},
+    )
+    heard = []
+    monkeypatch.setattr(notifier, "notify", lambda recs, settings: heard.extend(recs))
+    out = stream_handler.handler({"Records": records})
+    assert out == {"batchItemFailures": [{"itemIdentifier": "2"}]}
+    assert [r["dynamodb"]["SequenceNumber"] for r in heard] == ["1"]

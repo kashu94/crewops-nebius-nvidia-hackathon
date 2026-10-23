@@ -376,8 +376,48 @@ def test_uncovered_seats_must_be_acknowledged_and_a_hopeless_one_closed(table):
     with pytest.raises(PlanError) as err:
         plans.close(MEERA, "r-hopeless", "cancelled")
     assert err.value.code == "FORBIDDEN"
-    assert plans.close(ANANYA, "r-hopeless", "KS589 cancelled").status == "CLOSED"
+    # The controller resolves it; an approver signs it off.
+    assert plans.close(ANANYA, "r-hopeless", "KS589 cancelled").status == "RESOLVING"
+    assert plans.confirm_resolution(MEERA, "r-hopeless").status == "CLOSED"
     assert get_disruption(table, "r-hopeless")["status"] == "CLOSED"
+
+
+def test_a_resolution_is_signed_off_or_sent_back_by_another_person(table):
+    hopeless = {
+        "pairing_id": "P-2291",
+        "role": "First Officer",
+        "crew_out": "C-1694",
+        "status": "no_legal_cover",
+    }
+    crafted(table, "r-resolve1", [hopeless])
+    plans = Plans(table)
+    plans.close(ANANYA, "r-resolve1", "KS412 cancelled with operations")
+    assert get_disruption(table, "r-resolve1")["status"] == "RESOLVING"
+    # In the approver's queue, with the controller's remark; never in the sender's.
+    (item,) = [q for q in plans.queue(MEERA) if q["kind"] == "to_confirm"]
+    assert item["remark"] == "KS412 cancelled with operations" and item["submitted_by"] == "ananya"
+    both = Caller("ananya", frozenset({Role.CONTROLLER, Role.APPROVER}), desk="desk-1")
+    assert not [q for q in plans.queue(both) if q["kind"] == "to_confirm"]
+    for who, code in ((ANANYA, "FORBIDDEN"), (PRIYA, "FORBIDDEN"), (both, "FOUR_EYES")):
+        with pytest.raises(PlanError) as err:
+            plans.confirm_resolution(who, "r-resolve1")
+        assert err.value.code == code
+    # Sent back with a reason: on the desk again, ready to resolve or plan.
+    with pytest.raises(PlanError) as err:
+        plans.return_resolution(MEERA, "r-resolve1", " ")
+    assert err.value.code == "INVALID"
+    assert plans.return_resolution(MEERA, "r-resolve1", "check the crew hotel").status == (
+        "OPTIONS_READY"
+    )
+    with pytest.raises(PlanError) as err:
+        plans.confirm_resolution(KARAN, "r-resolve1")
+    assert err.value.code == "WRONG_STATE"
+    # Resolved again and signed off: closed, with what the controller did as its reason.
+    plans.close(ANANYA, "r-resolve1", "KS412 cancelled; crew stood down")
+    plans.confirm_resolution(KARAN, "r-resolve1")
+    closed = [e for e in store.audit_trail(table, "r-resolve1") if e["action"] == "CLOSED"]
+    assert closed[-1]["reason"] == "KS412 cancelled; crew stood down"
+    assert closed[-1]["actor"] == "karan" and closed[-1]["handled_by"] == "ananya"
 
 
 def test_sent_back_plans_leave_the_queue_once_resolved(plans):
@@ -625,3 +665,14 @@ def test_a_choice_for_one_trip_is_re_judged_for_the_next_days_trip(table):
     assert "C-3983" not in [o.crew_id for o in result.crew_options]
     (gone,) = [e for e in result.excluded if e.crew_id == "C-3983"]
     assert "only 11.75h rest after P-2291 on 2026-10-14" in gone.reasons
+
+
+def test_a_trip_that_started_before_approval_is_not_re_crewed(plans, table):
+    """Approval re-runs the search done at submission: a trip under way can't be changed."""
+    plan = plans.submit(ANANYA, "r-sick1042").plan
+    first_report = Operation.load(table).world.days_of("P-2291")[0].report_utc
+    later = Plans(table, load=lambda t: Operation.load(t, now=first_report + timedelta(hours=3)))
+    out = later.approve(MEERA, "r-sick1042", plan["plan_id"])
+    assert out.status != "COMMITTED"
+    assert any("can no longer be re-crewed" in r for r in out.reasons), out.reasons
+    assert ("Captain", "C-1042") in crew_of(table, "P-2291")  # the roster is untouched

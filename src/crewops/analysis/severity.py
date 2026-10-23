@@ -36,9 +36,16 @@ BEYOND_RESERVE = {
 }
 
 
-def _first_date(seats: list[Mapping[str, Any]]) -> date | None:
-    days = [d for s in seats for d in (s.get("impact") or {}).get("affected_dates") or []]
-    return date.fromisoformat(min(days)) if days else None
+def _first_date(seats: list[Mapping[str, Any]], since: date | None = None) -> date | None:
+    """The earliest affected date, or with ``since`` the earliest on or after it (a
+    several-day absence read on its second day still flies today)."""
+    days = [
+        date.fromisoformat(d)
+        for s in seats
+        for d in (s.get("impact") or {}).get("affected_dates") or []
+    ]
+    days = [d for d in days if since is None or d >= since]
+    return min(days) if days else None
 
 
 ACTIVE = ("options", "no_legal_cover")
@@ -101,13 +108,13 @@ def severity(
         soft.append(f"{passengers} passengers booked")
     if len(seats) >= MANY_SEATS:
         soft.append(f"{len(seats)} seats to cover")
-    first = _first_date(seats)
     start = today
     if start is None and reported_utc:
         try:
             start = date.fromisoformat(reported_utc[:10])
         except ValueError:
             start = None
+    first = _first_date(seats, start)
     if first and start:
         lead = (first - start).days
         if 0 <= lead <= 1:

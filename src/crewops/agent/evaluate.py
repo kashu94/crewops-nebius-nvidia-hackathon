@@ -341,6 +341,13 @@ def main(argv: list[str] | None = None) -> int:
 
         settings = Settings.from_env()
         live = build(settings, table_for(settings))
+        if live.advisor is None:
+            print(
+                "No Nebius Token Factory key (NEBIUS_API_KEY, or Parameter Store): a live run "
+                "without the models would be reported as Nemotron's. Stopping.",
+                file=sys.stderr,
+            )
+            return 1
         asker: Asker = live.ask
         router = live.pipeline.router
     else:

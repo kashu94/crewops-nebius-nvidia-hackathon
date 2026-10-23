@@ -26,6 +26,13 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
             # "ignore your/previous instructions", but not "can we ignore the rest rule?"
             r"\b(ignore|disregard|forget|override)\s+(all\s+)?(of\s+)?(your|previous|prior"
             r"|above|earlier)\s+(\w+\s+)?(instructions?|rules|prompts?|guidelines"
+            r"|restrictions|guardrails?)\b"
+            # "Ignore the previous instructions" as an order, but not "does the new table
+            # override the earlier rules?"
+            + r"|"
+            + _ORDER
+            + r"(ignore|disregard|forget|override)\s+(all\s+)?(of\s+)?the\s+(previous|prior"
+            r"|above|earlier)\s+(\w+\s+)?(instructions?|rules|prompts?|guidelines"
             r"|restrictions|guardrails?)\b",
         ),
         ("reveal prompt", r"\b(reveal|show|print|repeat|leak)\b[^.?!]{0,30}\bsystem prompt\b"),

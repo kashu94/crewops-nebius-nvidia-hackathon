@@ -105,20 +105,27 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
                 now=datetime.now(UTC),
             )
 
-    result = process(event.get("Records", []), events, alerts, settings.stage, escalate)
+    records = event.get("Records", [])
+    result = process(records, events, alerts, settings.stage, escalate)
+    # A failed record is retried with everything after it. Chimes and pushes go only for the
+    # records before it now, or the retry would announce those twice.
+    failed = {f["itemIdentifier"] for f in result["batchItemFailures"]}
+    if failed:
+        cut = next(i for i, r in enumerate(records) if r["dynamodb"]["SequenceNumber"] in failed)
+        records = records[:cut]
     if settings.alexa_skill_id:
         # never fails the batch, see crewops.alexa.notifier
         try:
             from crewops.alexa.notifier import notify
 
-            notify(event.get("Records", []), settings)
+            notify(records, settings)
         except Exception:
             log.exception("Alexa notifications failed")
     if settings.push_enabled:
         try:
             from crewops.notify.push_alerts import notify as push_notify
 
-            push_notify(event.get("Records", []), settings)
+            push_notify(records, settings)
         except Exception:
             log.exception("desktop alerts failed")
     return result

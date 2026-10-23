@@ -248,3 +248,31 @@ def test_run_command_carries_on_after_a_failure(table, monkeypatch, capsys):
 def test_store_analysis_on_a_missing_disruption(table):
     now = datetime(2026, 10, 13, 6, tzinfo=UTC)
     assert store_analysis(table, "r-gone0001", {}, now) is AnalysisOutcome.MISSING
+
+
+def test_a_whole_day_absence_beats_a_part_day_one_on_any_of_its_days():
+    from datetime import date
+
+    from crewops.analysis.runner import absences_from
+
+    def item(report_id, details):
+        return {"report": to_dynamo(report(report_id=report_id, details=details))}
+
+    whole = item(
+        "r-whole001",
+        {"crew_id": "C-1042", "from_date": "2026-10-12", "to_date": "2026-10-14", "reason": "sick"},
+    )
+    part = item(
+        "r-part0001",
+        {
+            "crew_id": "C-1042",
+            "from_date": "2026-10-13",
+            "from_utc": "2026-10-13T08:00:00Z",
+            "reason": "sick",
+        },
+    )
+    # Sick all of 12-14 Oct, so not "only from 08:00" on the 13th.
+    assert (("C-1042", date(2026, 10, 13))) not in absences_from([whole, part])
+    assert absences_from([part]) == {
+        ("C-1042", date(2026, 10, 13)): datetime(2026, 10, 13, 8, tzinfo=UTC)
+    }

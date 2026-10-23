@@ -23,6 +23,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -36,8 +37,66 @@ REMINDERS = "alexa::alerts:reminders:skill:readwrite"
 LOCALES = ("en-IN", "en-US", "en-AU")
 HELP = (
     "You can ask: what's waiting for me. Or ask CrewOps a question, such as: ask CrewOps who "
-    "covers P 2291."
+    "covers C 1042 on P 2291."
 )
+QUESTION_STARTS = {
+    "AskWhoIntent": "who",
+    "AskWhosIntent": "who's",
+    "AskWhatIntent": "what",
+    "AskWhatsIntent": "what's",
+    "AskWhichIntent": "which",
+    "AskWhenIntent": "when",
+    "AskWhereIntent": "where",
+    "AskHowIntent": "how",
+    "AskWhyIntent": "why",
+    "AskIsIntent": "is",
+    "AskAreIntent": "are",
+    "AskAmIntent": "am",
+    "AskCanIntent": "can",
+    "AskCouldIntent": "could",
+    "AskShouldIntent": "should",
+    "AskWillIntent": "will",
+    "AskDoIntent": "do",
+    "AskDoesIntent": "does",
+    "AskHasIntent": "has",
+    "AskHaveIntent": "have",
+    "AskExplainIntent": "explain",
+    "AskShowIntent": "show",
+    "AskListIntent": "list",
+    "AskGiveMeIntent": "give me",
+    "AskAnyIntent": "any",
+}
+"""A free-form question needs words before its slot (AMAZON.SearchQuery can't stand alone),
+and the slot holds only what follows them. So each opening word has its own intent, and the
+word is put back here: "who covers C 1042 on P 2291" arrives as AskWhoIntent with "covers C
+1042 on P 2291"."""
+SAID = {"HelloIntent": "hello", "ThanksIntent": "thank you"}
+
+EXAMPLES = {
+    "crew": "ask CrewOps when do I fly next",
+    "reporter": "ask CrewOps is gate BLR G6 free",
+    "auditor": "ask CrewOps is C 1042 legal for P 2291",
+    "admin": "ask CrewOps how many open disruptions each controller has",
+    "super_admin": "ask CrewOps how many open disruptions each controller has",
+}
+
+
+def help_for(caller: Any) -> str:
+    """What this person can say: "what's waiting" only means something to a desk or an
+    approval queue."""
+    roles = {getattr(r, "value", r) for r in getattr(caller, "roles", ())}
+    if roles & {"controller", "approver"}:
+        return HELP
+    example = next((EXAMPLES[r] for r in EXAMPLES if r in roles), "ask CrewOps what can I do")
+    return f"Ask CrewOps a question, such as: {example}. Or say: ask CrewOps what can I do."
+
+
+def first_name(user_id: str) -> str:
+    """ "rohit.malhotra" -> "Rohit"; crew sign-ins ("c1042.nair") -> "Nair"."""
+    parts = user_id.split(".")
+    if re.fullmatch(r"c\d+", parts[0], re.I) and len(parts) > 1:
+        return parts[-1].title()
+    return parts[0].title()
 
 
 def response(
@@ -137,8 +196,7 @@ class Skill:
         return response("Sorry, I can't do that yet. " + HELP, end=False, reprompt=HELP)
 
     def launch(self, caller: Any, envelope: dict[str, Any]) -> dict[str, Any]:
-        name = caller.user_id.split(".")[0].title()
-        text = f"Welcome to CrewOps, {name}. {HELP}"
+        text = f"Welcome to CrewOps, {first_name(caller.user_id)}. {help_for(caller)}"
         granted = ((system(envelope).get("user") or {}).get("permissions") or {}).get(
             "consentToken"
         )
@@ -150,7 +208,7 @@ class Skill:
             )
             text += " Allow reminders too, and your Echo will say what happened."
             card = {"type": "AskForPermissionsConsent", "permissions": [PERMISSION, REMINDERS]}
-        return response(text, end=False, reprompt=HELP, card=card)
+        return response(text, end=False, reprompt=help_for(caller), card=card)
 
     def announce(self, message: dict[str, Any], sys: dict[str, Any], now: datetime) -> dict:
         """Turns the notifier's text into a reminder a few seconds out. Safe to trust the
@@ -175,17 +233,22 @@ class Skill:
         name = intent.get("name", "")
         if name == "WhatsWaitingIntent":
             return self.waiting(caller)
-        if name == "AskCrewOpsIntent":
+        if name == "AskCrewOpsIntent" or name in QUESTION_STARTS or name in SAID:
             question = ((intent.get("slots") or {}).get("question") or {}).get("value", "").strip()
+            if name in QUESTION_STARTS and question:
+                question = f"{QUESTION_STARTS[name]} {question}"
+            question = SAID.get(name, question)
             if not question:
-                return response("What would you like to ask?", end=False, reprompt=HELP)
+                return response("What would you like to ask?", end=False, reprompt=help_for(caller))
             answer = self.api.ask(caller, question)
             return response(answer["answer"], end=False, reprompt="Anything else?")
         if name in ("AMAZON.StopIntent", "AMAZON.CancelIntent"):
             return response("Goodbye.")
         if name in ("AMAZON.HelpIntent", "AMAZON.FallbackIntent", "AMAZON.NavigateHomeIntent"):
-            return response(HELP, end=False, reprompt=HELP)
-        return response("Sorry, I didn't catch that. " + HELP, end=False, reprompt=HELP)
+            return response(help_for(caller), end=False, reprompt=help_for(caller))
+        return response(
+            "Sorry, I didn't catch that. " + help_for(caller), end=False, reprompt=help_for(caller)
+        )
 
     def waiting(self, caller: Any) -> dict[str, Any]:
         from crewops.mcp.api import ApiError

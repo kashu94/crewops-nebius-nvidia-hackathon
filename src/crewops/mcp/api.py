@@ -31,6 +31,7 @@ from crewops.analysis.runner import (
     absences_from,
 )
 from crewops.analysis.severity import severity
+from crewops.auth.accounts import AccountError, Accounts, may_reset, new_password
 from crewops.domain import DataError, Report, Role, authorize
 from crewops.domain.desks import owning_desks
 from crewops.domain.reports import (
@@ -61,6 +62,7 @@ from crewops.store.reports import (
     rejections_for,
     suggestions_for,
 )
+from crewops.store.users import get_profile, list_profiles
 from crewops.tools import TOOL_SCHEMAS, Caller, allowed_tools, dispatch
 from crewops.tools.errors import INTERNAL
 
@@ -77,24 +79,25 @@ CREW_LOOK_BACK_DAYS = 5
 """How far back crew see their own flights."""
 READERS = frozenset({Role.CONTROLLER, Role.APPROVER, Role.AUDITOR, Role.ADMIN, Role.SUPER_ADMIN})
 ADMINS = frozenset({Role.ADMIN, Role.SUPER_ADMIN})
-FEED_STATUSES = ("REPORTED", "OPTIONS_READY", "SUBMITTED", "COMMITTED", "CLOSED")
+FEED_STATUSES = ("REPORTED", "OPTIONS_READY", "SUBMITTED", "RESOLVING", "COMMITTED", "CLOSED")
 OUTCOME = {
     "REPORTED": "Received; crew control is analysing it.",
     "OPTIONS_READY": "Crew control is arranging cover.",
     "SUBMITTED": "A plan is waiting for approval.",
+    "RESOLVING": "Handled by crew control; waiting for an approver to sign it off.",
     "COMMITTED": "Cover has been arranged.",
     "CLOSED": "Resolved by crew control.",
+    "REVOKED": "Revoked by an admin: filed in error.",
 }
 RESOLVED = ("COMMITTED", "CLOSED")
 
 
 def _remark(table: Any, disruption_id: str, status: str) -> str | None:
-    """What crew control said when it resolved or closed the disruption."""
-    if status != "CLOSED":
+    """What crew control said when it resolved or closed the disruption, or the admin's
+    reason for revoking it."""
+    if status not in ("CLOSED", "REVOKED"):
         return None
-    closed = [
-        e for e in plan_store.audit_trail(table, disruption_id) if e.get("action") == "CLOSED"
-    ]
+    closed = [e for e in plan_store.audit_trail(table, disruption_id) if e.get("action") == status]
     return closed[-1].get("reason") if closed else None
 
 
@@ -215,12 +218,14 @@ class CrewOpsApi:
         cache_seconds: float = CACHE_SECONDS,
         memory: ConversationMemory | None = None,
         alerts: AlertSubscriptions | None = None,
+        accounts: Accounts | None = None,
     ) -> None:
         """``live_factory`` builds the answer pipeline over the current operation
         (``agent.service.build``); ``send`` puts a report on the ingest queue. Without
         ``memory`` every question stands on its own; without ``alerts`` the alert tools
         say alerts are not set up."""
         self.table = table
+        self.accounts = accounts
         self._feed_cache: dict[tuple[str, int], tuple[float, list[dict]]] = {}
         self.live_factory = live_factory
         self.send = send
@@ -230,6 +235,8 @@ class CrewOpsApi:
         self._live: Any = None
         self._loaded = 0.0
         self._refreshing = False
+        # Bumped by ``invalidate``: a reload that began before it read the old roster.
+        self._generation = 0
         self._loading = threading.Lock()
         # The pipeline keeps per-question state (model usage, the advisor's last run), so
         # one question at a time uses it; tool calls run on other threads meanwhile.
@@ -254,14 +261,17 @@ class CrewOpsApi:
             stale = time.monotonic() - self._loaded > self.cache_seconds
             if stale and not self._refreshing:
                 self._refreshing = True
-                threading.Thread(target=self._refresh, daemon=True).start()
+                threading.Thread(
+                    target=self._refresh, args=(self._generation,), daemon=True
+                ).start()
             return self._live
 
-    def _refresh(self) -> None:
+    def _refresh(self, generation: int = 0) -> None:
         try:
             fresh = self.live_factory()
             with self._loading:
-                self._live, self._loaded = fresh, time.monotonic()
+                if generation == self._generation:
+                    self._live, self._loaded = fresh, time.monotonic()
         except Exception:
             log.exception("reloading the operation failed; the previous copy stays")
         finally:
@@ -271,6 +281,7 @@ class CrewOpsApi:
     def invalidate(self) -> None:
         with self._loading:
             self._live = None
+            self._generation += 1
         self._feed_cache.clear()  # an action here is heard at once, not after the cache
 
     def ask(self, caller: Caller, question: str, conversation_id: str = "") -> dict[str, Any]:
@@ -395,11 +406,18 @@ class CrewOpsApi:
         days: list[date] = [date.fromisoformat(d[k]) for k in ("from_date", "to_date") if k in d]
         days += [date.fromisoformat(d[k][:10]) for k in ("from_utc", "to_utc") if d.get(k)]
         if d.get("flight_id"):
-            days.append(date.fromisoformat(str(d["flight_id"])[-10:]))
+            try:
+                days.append(date.fromisoformat(str(d["flight_id"])[-10:]))
+            except ValueError:
+                return f"flight_id: a flight id with its date, like DX401-{today}"
         # A certificate may already have lapsed; one lapsing beyond the window is not a
         # disruption yet.
         if d.get("valid_to") and date.fromisoformat(d["valid_to"]) > latest:
             return f"valid_to: up to {latest} (two months ahead)"
+        if report.report_type is ReportType.GATE_CHANGE:
+            current = next((g.gate for g in tools.gates if g.flight_id == d.get("flight_id")), None)
+            if current and current == d.get("new_gate"):
+                return f"new_gate: {d['flight_id']} already boards at {current}; pick another gate"
         bad = [x for x in days if not earliest <= x <= latest]
         if not bad:
             return None
@@ -419,6 +437,7 @@ class CrewOpsApi:
             raise ApiError("FORBIDDEN", "your role may not read disruptions")
         items = [i for status in FEED_STATUSES for i in disruptions_with_status(self.table, status)]
         tools = self.live().pipeline.tools
+        today = self.clock().date()  # as the record rates it: how soon it flies from now
         out = []
         for item in items:
             report = from_dynamo(item.get("report") or {})
@@ -432,7 +451,7 @@ class CrewOpsApi:
                     "reported_by": (report.get("reported_by") or {}).get("user_id"),
                     "details": report.get("details", {}),
                     "summary": analysis.get("summary", ""),
-                    "severity": severity(analysis, report.get("reported_utc"))
+                    "severity": severity(analysis, report.get("reported_utc"), today)
                     if analysis
                     else None,
                     "handling": (analysis.get("handling") or {}).get("kind"),
@@ -503,6 +522,8 @@ class CrewOpsApi:
             "reported_utc": report.get("reported_utc"),
             "reported_by": (report.get("reported_by") or {}).get("user_id"),
             "details": report.get("details", {}),
+            # What the reporter (or the crew member) added for crew control, in their words.
+            "narrative": report.get("narrative") or "",
             "desks": desks,
             # Touching no aircraft at all (a closed gate nobody was using): any desk's.
             "yours": bool(caller.desk)
@@ -624,9 +645,24 @@ class CrewOpsApi:
                     "days": days,
                 }
             )
+        crew = tools.world.crew.get(caller.crew_id)
+        # A reserve's duty is standby: the days on call and the window a callout falls in.
+        on_call = [
+            {
+                "date": d.isoformat(),
+                "base": duty.base,
+                "from_utc": duty.window_start.strftime("%H:%M"),
+                "to_utc": duty.window_end.strftime("%H:%M"),
+            }
+            for duty in tools.world.reserves.get(caller.crew_id, ())
+            for d in duty.dates
+            if first <= d <= last
+        ]
         return {
             "crew_id": caller.crew_id,
-            "name": mine[0]["name"] if mine else None,
+            "name": mine[0]["name"] if mine else (crew.name if crew else None),
+            "rank": crew.rank.value if crew else None,
+            "on_call": sorted(on_call, key=lambda o: o["date"]),
             "airline": tools.world.airline_of_crew.get(caller.crew_id),
             "notices": self._crew_notices(caller.crew_id),
             "reported_unavailable": self._reported_out(caller.crew_id),
@@ -735,6 +771,14 @@ class CrewOpsApi:
             filed = [
                 f for f in filed_recently(self.table, 300) if "crew" in (f.get("roles") or [])
             ][:limit]
+            states = [self._filed_state(f) for f in filed]
+            if not caller.roles & READERS:
+                # The reporting desk follows who is out and how it stands, never why (sick,
+                # fatigue and the like are crew control's business), as on the operations view.
+                for s in states:
+                    s["details"] = {k: v for k, v in s["details"].items() if k != "reason"}
+                    s["narrative"] = ""
+            return states
         elif scope == "leave":
             # Leave booked by rostering: the admins who book it, and crew control.
             if not caller.roles & (LEAVE_FILERS | READERS):
@@ -884,6 +928,7 @@ class CrewOpsApi:
         if Role.SPEAKER not in caller.roles:
             raise ApiError("FORBIDDEN", "only a speaker device hears the alert feed")
         # Several screens poll every few seconds: one read serves them all for a moment.
+        limit = max(1, min(int(limit), 50))  # also bounds the cache to one entry per scope
         key = (scope, limit)
         now = time.monotonic()
         cached = self._feed_cache.get(key)
@@ -1000,7 +1045,9 @@ class CrewOpsApi:
         ]
         out_today = {c for c, days in world.unavailable.items() if any(d == today for d, _ in days)}
         reserves = {
-            r for r, duties in world.reserves.items() if any(today in d.dates for d in duties)
+            r
+            for r, duties in world.reserves.items()
+            if any(today in d.dates for d in duties) and r not in out_today
         }
         affected = {f for c in cards for f in c["impact"]["flight_ids"]}
         upcoming = sorted(
@@ -1291,6 +1338,95 @@ class CrewOpsApi:
         return rule_store.activity(self.table, max(1, min(int(limit), 200)))
 
     # ------------------------------------------------------------------
+    # Admin: revoke a report filed in error, reset a password
+    # ------------------------------------------------------------------
+
+    def revoke_report(self, caller: Caller, disruption_id: str, reason: str) -> dict[str, Any]:
+        """Withdraw a report filed in error (a reporter's, a crew member's own absence, or
+        planned leave) while nothing has been done about it. A plan waiting for approval is
+        withdrawn with it. Once cover is approved the roster has changed, so crew control
+        resolves it instead."""
+        if not caller.roles & ADMINS:
+            raise ApiError("FORBIDDEN", "only an admin revokes a report")
+        if not reason.strip():
+            raise ApiError("INVALID", "say why the report is revoked")
+        item = get_disruption(self.table, disruption_id)
+        if item is None:
+            raise ApiError("NOT_FOUND", f"no disruption {disruption_id}")
+        status = item["status"]
+        handling = from_dynamo(item.get("analysis") or {}).get("handling") or {}
+        recorded = status == "CLOSED" and handling.get("kind") == "recorded"
+        if status not in ("REPORTED", "OPTIONS_READY", "SUBMITTED", "RESOLVING") and not recorded:
+            why = {
+                "COMMITTED": "cover was approved and the roster changed; crew control resolves it",
+                "CLOSED": "crew control already resolved it",
+                "REVOKED": "it is already revoked",
+            }.get(status, f"it is {status}")
+            raise ApiError("WRONG_STATE", f"{disruption_id} can't be revoked: {why}")
+        plan = None
+        if status == "SUBMITTED" and item.get("plan_id"):
+            plan = plan_store.get_plan(self.table, disruption_id, item["plan_id"])
+        try:
+            plan_store.revoke(
+                self.table,
+                disruption_id,
+                status,
+                caller.user_id,
+                self.clock(),
+                reason.strip()[:300],
+                plan,
+            )
+        except plan_store.Conflict:
+            raise ApiError("CONFLICT", f"{disruption_id} changed meanwhile; look again") from None
+        self.invalidate()  # the crew it named are available again at once
+        return {"disruption_id": disruption_id, "status": plan_store.STATUS_REVOKED, "was": status}
+
+    def team_accounts(self, caller: Caller) -> list[dict[str, Any]]:
+        """The team's sign-ins and roles, with whether this admin may reset each password."""
+        if not caller.roles & ADMINS:
+            raise ApiError("FORBIDDEN", "only an admin sees the team's accounts")
+        out = []
+        for p in sorted(list_profiles(self.table), key=lambda p: p.get("username", "")):
+            roles = [Role(r) for r in p.get("roles") or [] if r in Role.__members__.values()]
+            try:
+                may_reset(caller.user_id, caller.roles, p["username"], roles)
+                resettable = True
+            except AccountError:
+                resettable = False
+            out.append(
+                {
+                    "username": p["username"],
+                    "name": p.get("name"),
+                    "roles": [r.value for r in roles],
+                    "crew_id": p.get("crew_id"),
+                    "may_reset": resettable,
+                }
+            )
+        return out
+
+    def reset_password(self, caller: Caller, username: str) -> dict[str, Any]:
+        """Give one team member a new random password, shown once to the admin."""
+        if self.accounts is None:
+            raise ApiError("UNAVAILABLE", "password resets are not set up on this server")
+        username = username.strip().lower()
+        profile = get_profile(self.table, username)
+        if profile is None:
+            raise ApiError("NOT_FOUND", f"no team member {username}")
+        roles = [Role(r) for r in profile.get("roles") or [] if r in Role.__members__.values()]
+        try:
+            may_reset(caller.user_id, caller.roles, username, roles)
+            password = new_password()
+            self.accounts.set_password(username, password)
+        except AccountError as exc:
+            raise ApiError(exc.code, exc.message) from None
+        security_store.log_password_reset(self.table, caller.user_id, username, self.clock())
+        return {
+            "username": username,
+            "password": password,
+            "note": "Shown once. Pass it on in person.",
+        }
+
+    # ------------------------------------------------------------------
     # Alert addresses (admins only)
     # ------------------------------------------------------------------
 
@@ -1351,3 +1487,9 @@ class CrewOpsApi:
 
     def close(self, caller: Caller, disruption_id: str, reason: str) -> dict[str, Any]:
         return self._plan_action(self.plans.close, caller, disruption_id, reason)
+
+    def confirm_resolution(self, caller: Caller, disruption_id: str) -> dict[str, Any]:
+        return self._plan_action(self.plans.confirm_resolution, caller, disruption_id)
+
+    def return_resolution(self, caller: Caller, disruption_id: str, reason: str) -> dict[str, Any]:
+        return self._plan_action(self.plans.return_resolution, caller, disruption_id, reason)

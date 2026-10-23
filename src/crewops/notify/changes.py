@@ -8,8 +8,10 @@ From -> to                 Alert to             Why
 =========================  ===================  ============================================
 REPORTED -> OPTIONS_READY  controller           a disruption is analysed and needs a plan
 OPTIONS_READY -> SUBMITTED approver             a plan is waiting for approval
+OPTIONS_READY -> RESOLVING approver             a resolution is waiting for sign-off
 SUBMITTED -> OPTIONS_READY controller           the plan was rejected, withdrawn or went
                                                 stale; the disruption needs another plan
+RESOLVING -> OPTIONS_READY controller           the resolution was sent back
 =========================  ===================  ============================================
 
 When a disruption is analysed (REPORTED -> OPTIONS_READY), each operational team its
@@ -26,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from crewops.store.plans import STATUS_SUBMITTED
+from crewops.store.plans import STATUS_RESOLVING, STATUS_SUBMITTED
 from crewops.store.reports import STATUS_OPTIONS_READY, STATUS_REPORTED
 
 CONSOLE_CHANNEL = "/ops/disruptions"
@@ -130,6 +132,12 @@ def alert_for(change: Change, stage: str) -> Alert | None:
     elif change.before == STATUS_SUBMITTED and change.after == STATUS_OPTIONS_READY:
         role, subject = "controller", f"plan sent back on {change.disruption_id}"
         body = f"{ref} is back with controllers: its plan was rejected, withdrawn or went stale."
+    elif change.before == STATUS_OPTIONS_READY and change.after == STATUS_RESOLVING:
+        role, subject = "approver", f"resolution waiting for sign-off on {change.disruption_id}"
+        body = f"{ref} was resolved by crew control and waits for an approver to sign it off."
+    elif change.before == STATUS_RESOLVING and change.after == STATUS_OPTIONS_READY:
+        role, subject = "controller", f"resolution sent back on {change.disruption_id}"
+        body = f"{ref} is back with controllers: its resolution was sent back."
     else:
         return None
     return Alert(role, f"CrewOps {stage}: {subject}"[:100], body + footer.format(role=role))

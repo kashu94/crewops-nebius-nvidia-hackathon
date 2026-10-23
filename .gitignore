@@ -11,9 +11,10 @@ htmlcov/
 dist/
 build/
 
-# Environment and secrets
+# Environment and secrets (.env.example is the committed template)
 .env
 .env.*
+!.env.example
 
 # AWS / CDK
 cdk.out/

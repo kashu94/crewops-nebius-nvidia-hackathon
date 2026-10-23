@@ -203,5 +203,13 @@ class McpStack(Stack):
             )
         )
 
+        # Admins reset a team member's password from the app (crewops.auth.accounts).
+        self.runtime.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["cognito-idp:AdminSetUserPassword"],
+                resources=[auth.user_pool.user_pool_arn],
+            )
+        )
+
         CfnOutput(self, "McpRuntimeArn", value=self.runtime.agent_runtime_arn)
         CfnOutput(self, "MemoryId", value=self.memory.memory_id)

@@ -54,6 +54,10 @@ class Strategy(StrEnum):
         }[self]
 
 
+SUBSTITUTES = frozenset({Strategy.COMMAND_UPGRADE, Strategy.RIGHT_SEAT})
+"""Another rank in the seat, which regulation allows only when own-rank cover is short."""
+
+
 SUBSTITUTE_BELOW = 3
 """With fewer legal crew of the seat's own rank than this, the qualified other rank is offered
 as well (command-qualified FOs for a captain's seat, right-seat-current captains for an FO's),
@@ -163,8 +167,13 @@ class OptionsResult:
     @property
     def next_tier_premium_inr(self) -> int:
         """Extra cost of the next-cheapest price tier over the recommendation."""
-        tiers = sorted({o.cost_inr for o in self.crew_options})
-        return tiers[1] - tiers[0] if len(tiers) > 1 else 0
+        if not self.recommended:
+            return 0
+        # Substitutes are listed after every own-rank option, so one can cost less than the
+        # recommendation; only dearer tiers count.
+        cheapest = self.recommended.cost_inr
+        dearer = [o.cost_inr for o in self.crew_options if o.cost_inr > cheapest]
+        return min(dearer) - cheapest if dearer else 0
 
     @property
     def equal_cost_alternatives(self) -> int:
@@ -200,16 +209,19 @@ def _resilience(world: World, a: Assessment, role: Rank, base: str) -> float:
     """Score for using one of today's on-call crew of this rank at this base.
 
     Taking the only reserve captain at a station hurts more than taking one of twelve, hence
-    100 * (n - 1) / n. A day-off callout leaves the pool alone and scores 100.
+    100 * (n - 1) / n. A day-off callout leaves the pool alone and scores 100. The pool is the
+    crew member's own airline's, since another airline's reserves can't cover its trips.
     """
     if not a.on_reserve:
         return 100.0
     day = a.days[0].date
+    airline = world.airline_of_crew.get(a.crew_id)
     pool = sum(
         1
         for crew_id, duties in world.reserves.items()
         if any(day in r.dates and r.base == base for r in duties)
         and world.crew[crew_id].rank is role
+        and world.airline_of_crew.get(crew_id) == airline
     )
     return 100.0 if pool <= 0 else round(100.0 * (pool - 1) / pool, 1)
 
@@ -218,17 +230,26 @@ def _assess(
     world: World, crew_id: str, pairing_id: str, delay_hours: float, delay_date: date | None
 ) -> Assessment:
     """``assess``, plus a departure slip when someone called now can't reach the airport by
-    report time."""
+    report time. A delay to the first day already gives them that much longer; only the
+    part of their lateness beyond it slips the departure further."""
     a = assess(world, crew_id, pairing_id, delay_hours, delay_date)
-    if not a.legal or a.positioning is not None or delay_hours:
+    if not a.legal or a.positioning is not None:
         return a
+    first = world.days_of(pairing_id)[0]
     reach = world.reachability.get(crew_id) or 0
     ready = world.snapshot_utc + timedelta(minutes=reach)
-    late = (ready - world.days_of(pairing_id)[0].report_utc).total_seconds() / 60
+    late = (ready - first.report_utc).total_seconds() / 60
+    if late <= 0:
+        return a
+    if delay_hours and delay_date not in (None, first.date):
+        # A later day's delay and a day-one slip can't both be judged in one assessment;
+        # the delay's own verdict stands, as before.
+        return a
+    late -= delay_hours * 60
     if late <= 0:
         return a
     minutes = -(-late // REACH_ROUNDING_MINUTES) * REACH_ROUNDING_MINUTES
-    slipped = assess(world, crew_id, pairing_id, minutes / 60)
+    slipped = assess(world, crew_id, pairing_id, delay_hours + minutes / 60, delay_date)
     return replace(slipped, reach_slip_hours=round(minutes / 60, 2))
 
 

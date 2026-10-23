@@ -39,6 +39,17 @@ def _hhmm(iso: str | None) -> str:
     return f"{iso[11:16]}Z" if iso and len(iso) >= 16 else str(iso)
 
 
+def _dated(iso: str | None) -> str:
+    """ "2026-10-13T06:00:00Z" -> "06:00Z on 2026-10-13"."""
+    return f"{_hhmm(iso)} on {iso[:10]}" if iso and len(iso) >= 16 else str(iso)
+
+
+def _flight(flight_id: str) -> str:
+    """ "KS412-2026-10-13" -> "KS412 of 2026-10-13"."""
+    number, _, day = flight_id.partition("-")
+    return f"{number} of {day}" if day else number
+
+
 def _who(row: dict[str, Any]) -> str:
     name, crew_id = row.get("name"), row.get("crew_id")
     return f"{name} ({crew_id})" if name and crew_id else str(crew_id or name)
@@ -323,19 +334,25 @@ def _gate(r: dict[str, Any], args: dict[str, Any]) -> str:
         if "occupied" in r:
             if r["occupied"]:
                 text += (
-                    f" is held by {r['occupying_flight_id'].split('-')[0]} until "
-                    f"{_hhmm(r['occupied_until'])} at {_hhmm(r['checked_at_utc'])}."
+                    f" is in use as of {_dated(r['checked_at_utc'])}: "
+                    f"{_flight(r['occupying_flight_id'])} holds it until "
+                    f"{_dated(r['occupied_until'])}."
                 )
             else:
-                text += f" is free at {_hhmm(r['checked_at_utc'])}."
+                text += f" is free as of {_dated(r['checked_at_utc'])}."
         else:
             text += f" on {r['date']}:"
+        now = r.get("checked_at_utc") if "occupied" in r else None
         slots = [
-            f"{s['flight_id'].split('-')[0]} {_hhmm(s['boarding_start_time'])}"
-            for s in r["schedule"][:SHOW]
-        ]
+            f"{_flight(s['flight_id'])} from {_dated(s['boarding_start_time'])}"
+            for s in r["schedule"]
+            if s["flight_id"] != r.get("occupying_flight_id")
+            and (now is None or s["boarding_end_time"] > now)
+        ][: 3 if now else SHOW]
         if slots:
-            text += " Boardings: " + "; ".join(slots) + "."
+            text += (" Next boardings: " if now else " Boardings: ") + "; ".join(slots) + "."
+        elif now is None:
+            text += " no boardings."
         return text
     if "occupied_boarding_gates" in r:
         return (

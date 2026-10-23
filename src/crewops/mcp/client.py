@@ -78,6 +78,7 @@ LIST_TOOLS = frozenset(
         "activity_log",
         "disruptions",
         "my_reports",
+        "team_accounts",
     }
 )
 """The server's tools that return a list. Their results arrive as one text item per

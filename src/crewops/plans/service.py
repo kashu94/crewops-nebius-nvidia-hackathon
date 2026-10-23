@@ -39,7 +39,7 @@ from typing import Any
 from crewops.analysis.runner import Operation
 from crewops.domain import Rank, Role
 from crewops.domain.desks import DESKS, Desk, owning_desks
-from crewops.engine import AlreadyStarted, World, assess, find_options
+from crewops.engine import AlreadyStarted, TripCancelled, World, find_options
 from crewops.engine.options import cabin_minimum, cabin_present
 from crewops.plans.fingerprint import fingerprint
 from crewops.store import plans as store
@@ -207,8 +207,9 @@ class Plans:
         """End a disruption that has no coverable seat, recording what was done (for example,
         the flights were cancelled). This is also how one handled outside crew control is
         marked resolved, with a remark: a gate closure re-gated by gate control, a delay every
-        crew member absorbs. Nothing on the roster changes, and a crew member it took out
-        stays out on its dates."""
+        crew member absorbs. It goes to RESOLVING for an approver other than this controller to
+        sign off (CLOSED) or send back. Nothing on the roster changes, and a crew member it
+        took out stays out on its dates."""
         desk = self._controller_desk(caller)
         item = self._disruption(disruption_id)
         if item["status"] != STATUS_OPTIONS_READY:
@@ -226,12 +227,62 @@ class Plans:
                 f"{', '.join(seat_key(s) for s in coverable)}: submit a plan instead",
             )
         try:
-            store.close_disruption(
+            store.submit_resolution(
                 self.table, disruption_id, caller.user_id, self.clock(), reason[:MAX_REASON]
             )
         except store.Conflict:
             raise PlanError("CONFLICT", f"{disruption_id} changed meanwhile") from None
-        return Outcome(store.STATUS_CLOSED, {"disruption_id": disruption_id, "reason": reason})
+        # Four eyes here too: an approver who is not this controller signs it off.
+        return Outcome(store.STATUS_RESOLVING, {"disruption_id": disruption_id, "reason": reason})
+
+    def _resolution(self, caller: Caller, disruption_id: str) -> dict[str, Any]:
+        """The submitted resolution an approver may decide: the controller's remark and who
+        sent it, checked for four eyes."""
+        if Role.APPROVER not in caller.roles:
+            raise PlanError("FORBIDDEN", "only an approver signs off a resolution")
+        item = self._disruption(disruption_id)
+        if item["status"] != store.STATUS_RESOLVING:
+            raise PlanError("WRONG_STATE", f"{disruption_id} is {item['status']}")
+        sent = [
+            e
+            for e in store.audit_trail(self.table, disruption_id)
+            if e.get("action") == "RESOLUTION_SUBMITTED"
+        ]
+        if not sent:
+            raise PlanError("WRONG_STATE", f"{disruption_id} has no resolution to sign off")
+        latest = sent[-1]
+        if latest.get("actor") == caller.user_id:
+            raise PlanError(
+                "FOUR_EYES", "a resolution is signed off by someone other than its sender"
+            )
+        return latest
+
+    def confirm_resolution(self, caller: Caller, disruption_id: str) -> Outcome:
+        sent = self._resolution(caller, disruption_id)
+        try:
+            store.confirm_resolution(
+                self.table,
+                disruption_id,
+                caller.user_id,
+                self.clock(),
+                str(sent.get("reason") or ""),
+                str(sent.get("actor") or ""),
+            )
+        except store.Conflict:
+            raise PlanError("CONFLICT", f"{disruption_id} changed meanwhile") from None
+        return Outcome(store.STATUS_CLOSED, {"disruption_id": disruption_id})
+
+    def return_resolution(self, caller: Caller, disruption_id: str, reason: str) -> Outcome:
+        self._resolution(caller, disruption_id)
+        if not reason.strip():
+            raise PlanError("INVALID", "say why it goes back to the desk")
+        try:
+            store.return_resolution(
+                self.table, disruption_id, caller.user_id, self.clock(), reason[:MAX_REASON]
+            )
+        except store.Conflict:
+            raise PlanError("CONFLICT", f"{disruption_id} changed meanwhile") from None
+        return Outcome(STATUS_OPTIONS_READY, {"disruption_id": disruption_id, "reason": reason})
 
     # ------------------------------------------------------------------
     # Approver actions
@@ -305,6 +356,24 @@ class Plans:
                 if plan["submitted_by"] != caller.user_id:
                     warnings = self.contention(plan, world)
                     out.append({"kind": "to_decide", **summary(plan), "warnings": list(warnings)})
+            for item in disruptions_with_status(self.table, store.STATUS_RESOLVING):
+                sent = [
+                    e
+                    for e in store.audit_trail(self.table, item["disruption_id"])
+                    if e.get("action") == "RESOLUTION_SUBMITTED"
+                ]
+                if sent and sent[-1].get("actor") != caller.user_id:
+                    analysis = from_dynamo(item.get("analysis") or {})
+                    out.append(
+                        {
+                            "kind": "to_confirm",
+                            "disruption_id": item["disruption_id"],
+                            "summary": analysis.get("summary", ""),
+                            "remark": sent[-1].get("reason", ""),
+                            "submitted_by": sent[-1].get("actor"),
+                            "submitted_utc": sent[-1].get("at"),
+                        }
+                    )
         desk = _desk(caller.desk) if Role.CONTROLLER in caller.roles else None
         if desk is not None:
             world = world or self.load(self.table).world
@@ -612,18 +681,32 @@ class Plans:
                 reasons.append(f"the crew of {pid} changed after the plan was submitted")
         reasons += Plans._below_cabin_minimum(world, plan)
         for a in plan["assignments"]:
-            if not a["crew_id"]:
-                continue  # operating short (checked above) or cancelling: nobody to re-check
+            # The same search as at submission, so a trip that has started since, or cover
+            # who can no longer reach the airport in time, makes the plan stale too.
             on = date.fromisoformat(a["delay_date"]) if a.get("delay_date") else None
             try:
-                check = assess(world, a["crew_id"], a["pairing_id"], float(a["delay_hours"]), on)
-            except Exception as exc:  # the crew member or pairing is gone
-                reasons.append(f"{a['crew_id']} on {a['pairing_id']}: {exc}")
+                result = find_options(
+                    world, a["pairing_id"], Rank(a["role"]), float(a["delay_hours"]), on
+                )
+            except (AlreadyStarted, TripCancelled) as exc:
+                reasons.append(str(exc))
                 continue
-            if not check.legal:
-                details = "; ".join(v.detail for v in check.blocking)
+            except Exception as exc:  # the crew member or pairing is gone
+                reasons.append(f"{a['crew_id'] or a['pairing_id']}: {exc}")
+                continue
+            if not a["crew_id"]:
+                continue  # operating short (checked above) or cancelling: nobody to re-check
+            option = next((o for o in result.crew_options if o.crew_id == a["crew_id"]), None)
+            if option is None:
+                why = next((e.reasons for e in result.excluded if e.crew_id == a["crew_id"]), ())
+                details = "; ".join(why) or "no longer among the legal options"
                 reasons.append(
                     f"{a['crew_id']} is no longer legal for {a['pairing_id']}: {details}"
+                )
+            elif option.delay_hours > 0 and option.cost_inr != a["cost_inr"]:
+                reasons.append(
+                    f"{a['crew_id']} can no longer reach {a['pairing_id']} by report time: "
+                    f"the departure would slip {option.delay_hours:g} h"
                 )
         return reasons
 
@@ -684,6 +767,8 @@ def summary(plan: Mapping[str, Any]) -> dict[str, Any]:
         "desk": plan["desk"],
         "submitted_by": plan["submitted_by"],
         "total_cost_inr": plan["total_cost_inr"],
+        # the controller's note to the approver, if any
+        "note": plan.get("note") or "",
         "assignments": [
             f"{a['pairing_id']} {a['role']}: {a['name']} ({a['crew_id']}) replacing "
             f"{a['replaces']}, ₹{a['cost_inr']:,}"

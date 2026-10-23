@@ -68,8 +68,9 @@ The owning desk sees it and decides.
 
 1. `operations_overview()` (or with `start` for another week) to see the day's flights,
    crew, and who is already out.
-2. `report_reference` for valid ids; never invent one. For a near miss:
-   `crew_tool("suggest_crew_ids", {"near": "C-104"})`, then confirm with the person.
+2. `report_reference` for valid ids; never invent one. For a near miss, offer the closest
+   ids from its crew list and confirm with the person (`suggest_crew_ids` is for crew
+   control, not the reporting desk).
 3. Read back: "Crew unavailable: C 2087, 15 October, sick. Send it?" Then
    `report_disruption("crew_unavailable", {"crew_id": "C-2087", "from_date": "2026-10-15",
    "reason": "sick"})`.
@@ -94,7 +95,9 @@ Report types and their details:
 
 `my_roster` → trips (with dates and flights), duty clock (7-day duty and 28-day flight
 hours against the limits) and notices (a certificate about to lapse). To report
-themselves unavailable: the same as a reporter, with their own `crew_id` only. Someone
+themselves unavailable: straight to `report_disruption("crew_unavailable", …)` with their
+own `crew_id` from `whoami`; `operations_overview` and `report_reference` are for the
+reporting desk and refuse the crew role. Someone
 unwell on a day off may still report it: nothing needs covering, but they will not be
 called out then.
 

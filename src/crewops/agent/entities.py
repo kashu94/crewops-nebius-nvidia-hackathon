@@ -524,7 +524,9 @@ def extract_dates(text: str, vocab: Vocabulary) -> list[str]:
                     found.append((m.start(), day.isoformat()))
                     break
                 day += timedelta(days=1)
-    if not found and TODAY_RE.search(text):
+    said_now = [m.group(1).lower() for m in TODAY_RE.finditer(text)]
+    # "currently scheduled for tomorrow" is about tomorrow; only the word "today" beats it
+    if not found and said_now and ("today" in said_now or not TOMORROW_RE.search(text)):
         found.append((0, vocab.today.isoformat()))
     if not found and TOMORROW_RE.search(text):
         found.append((0, (vocab.today + timedelta(days=1)).isoformat()))
