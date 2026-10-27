@@ -67,7 +67,8 @@ def test_runtime_speaks_mcp_behind_the_cognito_authorizer(template):
     ):
         assert key in env, key
     assert env["CREWOPS_NEBIUS_BASE_URL"] == "https://api.tokenfactory.nebius.com/v1/"
-    assert env["CREWOPS_ADVISOR_MODEL_ID"] == "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+    assert env["CREWOPS_ADVISOR_MODEL_ID"] == "nvidia/Nemotron-3_5-Lightning"
+    assert env["CREWOPS_NEBIUS_REASONING"] == "off"
     assert not any("API_KEY" in k for k in env)  # the key is read from Parameter Store
     assert p["LifecycleConfiguration"]["IdleRuntimeSessionTimeout"] == 300
 

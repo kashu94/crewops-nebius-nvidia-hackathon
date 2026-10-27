@@ -12,7 +12,7 @@ from agent_fixtures import examples, tools, vocab
 from crewops.agent.breaker import CircuitBreaker, GuardedClient, is_outage
 from crewops.agent.models import ModelAdvisor, ModelExplainer
 from crewops.agent.nebius import (
-    NEMOTRON_70B,
+    NEMOTRON,
     NebiusClient,
     NebiusError,
     NebiusUnavailable,
@@ -110,13 +110,13 @@ def test_a_converse_request_becomes_a_chat_completion():
         },
     ]
     body = to_chat_request(
-        NEMOTRON_70B,
+        NEMOTRON,
         [{"text": "You are CrewOps."}],
         messages,
         {"maxTokens": 800, "temperature": 0},
         bedrock_tool_config({"lookup"}),
     )
-    assert body["model"] == NEMOTRON_70B
+    assert body["model"] == NEMOTRON
     assert body["max_tokens"] == 800 and body["temperature"] == 0
     roles = [m["role"] for m in body["messages"]]
     assert roles == ["system", "user", "assistant", "tool"]
@@ -134,9 +134,7 @@ def test_a_converse_request_becomes_a_chat_completion():
 
 
 def test_no_tools_means_no_tool_fields():
-    body = to_chat_request(
-        NEMOTRON_70B, None, [{"role": "user", "content": [{"text": "q"}]}], {}, None
-    )
+    body = to_chat_request(NEMOTRON, None, [{"role": "user", "content": [{"text": "q"}]}], {}, None)
     assert "tools" not in body and "tool_choice" not in body
     assert body["messages"] == [{"role": "user", "content": "q"}]
 
@@ -178,7 +176,7 @@ def test_the_client_posts_to_token_factory_with_the_key():
     wire = FakeTokenFactory([chat_text("ok")])
     client = NebiusClient("nb-secret", "https://api.tokenfactory.nebius.com/v1", opener=wire)
     out = client.converse(
-        modelId=NEMOTRON_70B,
+        modelId=NEMOTRON,
         messages=[{"role": "user", "content": [{"text": "hi"}]}],
         inferenceConfig={"maxTokens": 10},
     )
@@ -186,7 +184,7 @@ def test_the_client_posts_to_token_factory_with_the_key():
     (request,) = wire.requests
     assert request["url"] == "https://api.tokenfactory.nebius.com/v1/chat/completions"
     assert request["headers"]["Authorization"] == "Bearer nb-secret"
-    assert request["body"]["model"] == NEMOTRON_70B
+    assert request["body"]["model"] == NEMOTRON
 
 
 @pytest.mark.parametrize(
@@ -212,8 +210,8 @@ def test_an_unreachable_service_is_an_outage_and_opens_the_breaker():
 
 
 def test_the_model_catalogue_is_listed():
-    wire = FakeTokenFactory([{"data": [{"id": NEMOTRON_70B}, {"id": "meta-llama/x"}]}])
-    assert NebiusClient("k", opener=wire).list_models() == ["meta-llama/x", NEMOTRON_70B]
+    wire = FakeTokenFactory([{"data": [{"id": NEMOTRON}, {"id": "meta-llama/x"}]}])
+    assert NebiusClient("k", opener=wire).list_models() == ["meta-llama/x", NEMOTRON]
     assert wire.requests[0]["url"].endswith("/v1/models")
 
 
@@ -227,7 +225,7 @@ def test_the_advisor_runs_its_tool_loop_on_nemotron_and_is_verified():
             chat_text("DX401 on 2026-10-12 has the most seats at risk: 162."),
         ]
     )
-    advisor = ModelAdvisor(NebiusClient("k", opener=wire), NEMOTRON_70B, tools())
+    advisor = ModelAdvisor(NebiusClient("k", opener=wire), NEMOTRON, tools())
     pipeline = Pipeline(tools(), Router(vocab(), examples()), drafter=advisor)
     answer = pipeline.answer(UNPLANNED, CONTROLLER)
     assert answer.source == "model" and answer.verification.ok
@@ -242,7 +240,7 @@ def test_an_invented_figure_from_nemotron_falls_back_to_the_template():
     wire = FakeTokenFactory(
         [chat_tool("lookup", json.dumps(SEATS)), chat_text("DX401 has 999 seats at risk.")]
     )
-    advisor = ModelAdvisor(NebiusClient("k", opener=wire), NEMOTRON_70B, tools())
+    advisor = ModelAdvisor(NebiusClient("k", opener=wire), NEMOTRON, tools())
     answer = Pipeline(tools(), Router(vocab(), examples()), drafter=advisor).answer(
         UNPLANNED, CONTROLLER
     )
@@ -251,7 +249,7 @@ def test_an_invented_figure_from_nemotron_falls_back_to_the_template():
 
 def test_a_token_factory_outage_still_gets_an_answer():
     wire = FakeTokenFactory([http_error(503, {"detail": "overloaded"})])
-    explainer = ModelExplainer(NebiusClient("k", opener=wire), NEMOTRON_70B)
+    explainer = ModelExplainer(NebiusClient("k", opener=wire), NEMOTRON)
     pipeline = Pipeline(tools(), Router(vocab(), examples()), polisher=explainer)
     answer = pipeline.answer("Can C-3310 cover P-2291?", CONTROLLER)
     assert answer.source == "template" and answer.verification.ok
@@ -305,7 +303,7 @@ def test_several_calls_in_one_turn_become_one_call_per_turn():
             ],
         },
     ]
-    chat = to_chat_request(NEMOTRON_70B, None, messages, {}, None)["messages"]
+    chat = to_chat_request(NEMOTRON, None, messages, {}, None)["messages"]
     assert [m["role"] for m in chat] == ["user", "assistant", "tool", "assistant", "tool"]
     assert all(len(m["tool_calls"]) == 1 for m in chat if m["role"] == "assistant")
     assert [m["tool_call_id"] for m in chat if m["role"] == "tool"] == ["planned-0", "planned-1"]
@@ -378,7 +376,7 @@ def test_the_advisor_gives_each_round_only_the_time_left():
 
     advisor = ModelAdvisor(
         Recording([chat_tool("lookup", json.dumps(SEATS)), chat_text("DX401 ... 162.")]),
-        NEMOTRON_70B,
+        NEMOTRON,
         tools(),
         budget_seconds=6.0,
     )
@@ -418,3 +416,66 @@ def test_a_parameter_store_hiccup_keeps_the_key_read_earlier(moto_aws, monkeypat
     failing("ThrottlingException")
     monkeypatch.setattr(nebius, "KEY_REUSE_SECONDS", 0)  # too long ago to trust
     assert api_key(name, "ap-southeast-2", {}) is None
+
+
+# -- Nemotron 3 specifics: thinking off, tool choice, leaked calls, the last round ------
+
+
+def test_thinking_is_off_unless_asked_for():
+    q = [{"role": "user", "content": [{"text": "q"}]}]
+    off = to_chat_request(NEMOTRON, None, q, {}, None)
+    assert off["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "chat_template_kwargs" not in to_chat_request(NEMOTRON, None, q, {}, None, True)
+    wire = FakeTokenFactory([chat_text("ok")])
+    NebiusClient("k", opener=wire, reasoning=True).converse(modelId="m", messages=q)
+    assert "chat_template_kwargs" not in wire.requests[0]["body"]
+
+
+@pytest.mark.parametrize(
+    ("choice", "expected"),
+    [
+        (None, "auto"),
+        ({"auto": {}}, "auto"),
+        ({"none": {}}, "none"),
+        ({"any": {}}, "required"),
+        ({"tool": {"name": "lookup"}}, {"type": "function", "function": {"name": "lookup"}}),
+    ],
+)
+def test_tool_choice_is_translated(choice, expected):
+    config = bedrock_tool_config({"lookup"})
+    if choice is not None:
+        config = {**config, "toolChoice": choice}
+    body = to_chat_request(
+        NEMOTRON, None, [{"role": "user", "content": [{"text": "q"}]}], {}, config
+    )
+    assert body["tool_choice"] == expected
+
+
+@pytest.mark.parametrize("text", ["<tool_call>\n<function=lookup>", "Sure. <function=ripple>{}"])
+def test_tool_call_syntax_written_as_text_is_no_answer(text):
+    assert from_chat_response(chat_text(text))["stopReason"] == "malformed_tool_use"
+
+
+def test_the_advisors_last_round_may_not_call_tools_and_is_asked_to_answer():
+    seen = []
+
+    class Recording:
+        def __init__(self, replies):
+            self.replies = list(replies)
+
+        def converse(self, **request):
+            seen.append(json.loads(json.dumps(request)))
+            return from_chat_response(self.replies.pop(0))
+
+    advisor = ModelAdvisor(
+        Recording([chat_tool("lookup", json.dumps(SEATS)), chat_text("DX401 ... 162.")]),
+        NEMOTRON,
+        tools(),
+        max_rounds=1,
+        budget_seconds=60,
+    )
+    Pipeline(tools(), Router(vocab(), examples()), drafter=advisor).answer(UNPLANNED, CONTROLLER)
+    assert len(seen) == 2
+    assert "toolChoice" not in seen[0]["toolConfig"]
+    assert seen[1]["toolConfig"]["toolChoice"] == {"none": {}}
+    assert seen[1]["messages"][-1]["content"][-1]["text"].startswith("Answer now")

@@ -20,6 +20,7 @@ import http.client
 import json
 import logging
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -29,7 +30,7 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
-NEMOTRON_70B = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+NEMOTRON = "nvidia/Nemotron-3_5-Lightning"
 API_KEY_ENV = ("NEBIUS_API_KEY", "CREWOPS_NEBIUS_API_KEY")
 """Where a local run finds the key. Deployed services read it from Parameter Store."""
 
@@ -115,7 +116,7 @@ def to_chat_messages(
 
 
 def _one_call_per_turn(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Llama 3.1 chat templates (Nemotron 70B's among them) refuse an assistant turn with more
+    """Some chat templates (Llama 3.1's among them) refuse an assistant turn with more
     than one tool call. Such a turn and the results after it become alternating single-call
     assistant turns, each followed by its own result."""
     out: list[dict[str, Any]] = []
@@ -162,15 +163,34 @@ def to_chat_tools(tool_config: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def to_tool_choice(choice: Mapping[str, Any] | None) -> Any:
+    """Converse ``toolChoice`` to chat completions ``tool_choice``. ``{"none": {}}`` (not a
+    Converse value; the advisor's last round uses it) means the model must answer in text."""
+    if not choice or "auto" in choice:
+        return "auto"
+    if "none" in choice:
+        return "none"
+    if "any" in choice:
+        return "required"
+    if "tool" in choice:
+        return {"type": "function", "function": {"name": choice["tool"]["name"]}}
+    return "auto"
+
+
 def to_chat_request(
     model_id: str,
     system: list[dict[str, Any]] | None,
     messages: list[dict[str, Any]],
     inference: Mapping[str, Any] | None,
     tool_config: Mapping[str, Any] | None,
+    reasoning: bool = False,
 ) -> dict[str, Any]:
     inference = inference or {}
     body: dict[str, Any] = {"model": model_id, "messages": to_chat_messages(system, messages)}
+    if not reasoning:
+        # Nemotron 3 models think before answering unless told not to. The roles need a
+        # short, direct reply within a voice budget, and thinking tokens are billed too.
+        body["chat_template_kwargs"] = {"enable_thinking": False}
     for ours, theirs in (
         ("maxTokens", "max_tokens"),
         ("temperature", "temperature"),
@@ -182,7 +202,7 @@ def to_chat_request(
     tools = to_chat_tools(tool_config) if tool_config else []
     if tools:
         body["tools"] = tools
-        body["tool_choice"] = "auto"
+        body["tool_choice"] = to_tool_choice((tool_config or {}).get("toolChoice"))
     return body
 
 
@@ -222,6 +242,10 @@ def from_chat_response(response: Mapping[str, Any]) -> dict[str, Any]:
         if calls:
             # Some servers finish a tool call with "stop"; the calls are what count.
             stop = "tool_use"
+    if not calls and stop == "end_turn" and _LEAKED_CALL.search(message.get("content") or ""):
+        # The model wrote its own tool-call syntax as text instead of a tool call or an
+        # answer. That is neither, so it counts as no answer.
+        stop = "malformed_tool_use"
     usage = response.get("usage") or {}
     return {
         "output": {"message": {"role": "assistant", "content": content}},
@@ -231,6 +255,9 @@ def from_chat_response(response: Mapping[str, Any]) -> dict[str, Any]:
             "outputTokens": int(usage.get("completion_tokens") or 0),
         },
     }
+
+
+_LEAKED_CALL = re.compile(r"<tool_call>|<function=|<\|python_tag\|>|\[TOOL_CALLS\]")
 
 
 # --------------------------------------------------------------------------
@@ -250,11 +277,13 @@ class NebiusClient:
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = 10.0,
         opener: Opener = urllib.request.urlopen,
+        reasoning: bool = False,
     ) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/") + "/"
         self.timeout = timeout
         self._open = opener
+        self.reasoning = reasoning
 
     def converse(
         self,
@@ -268,7 +297,9 @@ class NebiusClient:
     ) -> dict[str, Any]:
         """Converse's parameter names and shapes, so the roles need no change. ``timeout``
         shortens this one call, for a caller with less time left than the client's default."""
-        body = to_chat_request(modelId, system, messages, inferenceConfig, toolConfig)
+        body = to_chat_request(
+            modelId, system, messages, inferenceConfig, toolConfig, self.reasoning
+        )
         seconds = self.timeout if timeout is None else min(self.timeout, timeout)
         return from_chat_response(self._request("POST", "chat/completions", body, seconds))
 

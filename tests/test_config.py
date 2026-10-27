@@ -9,7 +9,7 @@ def test_defaults_without_environment():
     s = Settings.from_env({})
     assert s.stage == "dev"
     assert s.aws_region == "ap-southeast-2"
-    nemotron = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+    nemotron = "nvidia/Nemotron-3_5-Lightning"
     assert s.advisor_model_id == s.router_model_id == s.explainer_model_id == nemotron
     assert s.embedding_model_id == "amazon.titan-embed-text-v2:0"
     assert s.nebius_base_url == "https://api.tokenfactory.nebius.com/v1/"
@@ -246,3 +246,10 @@ def test_env_example_loads_as_documented(private_environ):
     load_env_file(example)
     s = Settings.from_env()
     assert s.stage == "dev" and s.guardrails_enabled is False
+
+
+def test_nebius_reasoning_is_off_by_default_and_on_or_off_only():
+    assert Settings.from_env({}).nebius_reasoning is False
+    assert Settings.from_env({"CREWOPS_NEBIUS_REASONING": "on"}).nebius_reasoning is True
+    with pytest.raises(ConfigError, match="CREWOPS_NEBIUS_REASONING"):
+        Settings.from_env({"CREWOPS_NEBIUS_REASONING": "maybe"})

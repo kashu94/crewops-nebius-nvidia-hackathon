@@ -34,7 +34,7 @@ QUICK_CALL_SECONDS = 3.0
 
 
 def nebius_runtime(settings: Settings, key: str, timeout: float) -> NebiusClient:
-    return NebiusClient(key, settings.nebius_base_url, timeout)
+    return NebiusClient(key, settings.nebius_base_url, timeout, reasoning=settings.nebius_reasoning)
 
 
 def nebius_api_key(settings: Settings) -> str | None:

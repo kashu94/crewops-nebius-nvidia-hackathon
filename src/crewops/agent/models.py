@@ -1,4 +1,4 @@
-"""The three model roles: NVIDIA Llama-3.1-Nemotron-70B-Instruct on Nebius Token Factory.
+"""The three model roles: NVIDIA Nemotron 3.5 Lightning on Nebius Token Factory.
 
 Triage classifies a question that neither the rules nor the semantic match could. It gets
 no tools.
@@ -115,6 +115,11 @@ class ModelTriage:
 
 ToolRunner = Callable[[str, dict[str, Any]], TraceEntry]
 
+FINAL_ROUND = (
+    "Answer now, in plain sentences, from the tool results above. No more tool calls. "
+    "If they do not settle the question, say what is missing."
+)
+
 
 def _result_text(entry: TraceEntry) -> str:
     payload = entry.result if entry.ok else {"error": entry.error_code, "message": entry.error}
@@ -178,13 +183,22 @@ class ModelAdvisor:
             if left <= 0:
                 self.last.stop = "budget"
                 return ""
+            # The last round (out of rounds, or a third of the time left) may not call more
+            # tools: the model answers from what it has gathered, instead of being cut off
+            # with no draft at all.
+            final = self.last.rounds >= self.max_rounds or left < self.budget_seconds / 3
+            call = config
+            if final and config:
+                call = {"toolConfig": {**config["toolConfig"], "toolChoice": {"none": {}}}}
+                if self.last.rounds and "text" not in messages[-1]["content"][-1]:
+                    messages[-1]["content"].append({"text": FINAL_ROUND})
             response = self.client.converse(
                 modelId=self.model_id,
                 system=system,
                 messages=messages,
                 inferenceConfig={"maxTokens": self.max_tokens, "temperature": 0},
                 timeout=left,  # a later round gets only the time that is left
-                **config,
+                **call,
             )
             self.last.usage.add(response)
             message = response["output"]["message"]
@@ -199,7 +213,7 @@ class ModelAdvisor:
                 if "toolUse" not in b or b["toolUse"]["name"] in allowed
             ]
             uses = [b["toolUse"] for b in content if "toolUse" in b]
-            if not uses or self.last.rounds >= self.max_rounds:
+            if not uses or final:
                 # no draft; the template answers instead
                 self.last.stop = "budget" if uses else "no_usable_tool"
                 return ""

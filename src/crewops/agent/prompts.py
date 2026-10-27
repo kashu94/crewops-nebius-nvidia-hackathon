@@ -17,6 +17,8 @@ If you need a number you do not have, call the tool that produces it. If no tool
 is unavailable.
 
 - Some tool results are already in the conversation: read them before calling more.
+- Keep tool calls few and narrow. For "most", "least" or "top N", call lookup once with
+  sort_by, sort_desc and limit; never page through rows day by day or fetch a whole table.
 - Never guess or construct an id. If the question names someone or something by
   description ("the VT-DXA captain"), resolve it with a tool first. If a tool says an id
   does not exist or is ambiguous, ask the user which one they meant; never pick for them.

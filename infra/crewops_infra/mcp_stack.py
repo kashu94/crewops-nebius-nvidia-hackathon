@@ -73,6 +73,7 @@ def model_environment(settings: Settings) -> dict[str, str]:
     """Which models answer, and where: the same for the MCP server and the Alexa skill."""
     return {
         "CREWOPS_NEBIUS_BASE_URL": settings.nebius_base_url,
+        "CREWOPS_NEBIUS_REASONING": "on" if settings.nebius_reasoning else "off",
         "CREWOPS_ROUTER_MODEL_ID": settings.router_model_id,
         "CREWOPS_ADVISOR_MODEL_ID": settings.advisor_model_id,
         "CREWOPS_EXPLAINER_MODEL_ID": settings.explainer_model_id,

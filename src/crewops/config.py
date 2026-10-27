@@ -26,14 +26,16 @@ DEFAULT_REGION = "ap-southeast-2"
 """Sydney. Everything we use on AWS is available there, including S3 Vectors, AgentCore,
 Bedrock Guardrails and the Titan embedding model."""
 
-# The three chat roles (triage, advisor, explainer) run NVIDIA Llama-3.1-Nemotron-70B-Instruct
-# on Nebius Token Factory, through its OpenAI-compatible API (crewops.agent.nebius). Any
-# Token Factory model with tool calling can be swapped in through the environment; check
-# what a key can use with ``python -m crewops.agent.nebius``.
+# The three chat roles (triage, advisor, explainer) run NVIDIA Nemotron 3.5 Lightning on
+# Nebius Token Factory, through its OpenAI-compatible API (crewops.agent.nebius): a 30B
+# mixture-of-experts model (3B active) made for agentic tool use, the fastest and cheapest
+# NVIDIA model there with tool calling. Any Token Factory model with tool calling can be
+# swapped in through the environment; check what a key can use with
+# ``python -m crewops.agent.nebius``.
 DEFAULT_NEBIUS_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
-DEFAULT_ROUTER_MODEL = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
-DEFAULT_ADVISOR_MODEL = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
-DEFAULT_EXPLAINER_MODEL = "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF"
+DEFAULT_ROUTER_MODEL = "nvidia/Nemotron-3_5-Lightning"
+DEFAULT_ADVISOR_MODEL = "nvidia/Nemotron-3_5-Lightning"
+DEFAULT_EXPLAINER_MODEL = "nvidia/Nemotron-3_5-Lightning"
 # Embeddings stay on Bedrock: the S3 Vectors indexes were built with Titan V2, and a query
 # must be embedded by the model that built the index.
 DEFAULT_EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
@@ -174,7 +176,7 @@ def _events_stage(env: Mapping[str, str]) -> str:
 BEDROCK_MODEL_RE = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+(:[0-9]+)?$")
 """A Bedrock model id: ``provider.model`` with no ``/``, sometimes with a region prefix and
 a ``:version`` (``amazon.nova-micro-v1:0``, ``global.amazon.nova-2-lite-v1:0``). Token
-Factory ids have an owner and a ``/``: ``nvidia/Llama-3.1-Nemotron-70B-Instruct-HF``."""
+Factory ids have an owner and a ``/``: ``nvidia/Nemotron-3_5-Lightning``."""
 
 
 def _chat_model(env: Mapping[str, str], key: str, default: str) -> str:
@@ -188,6 +190,13 @@ def _chat_model(env: Mapping[str, str], key: str, default: str) -> str:
             f"Factory: use a Token Factory id such as {default!r}, or remove the line"
         )
     return model
+
+
+def _reasoning(env: Mapping[str, str]) -> bool:
+    value = (_get(env, "CREWOPS_NEBIUS_REASONING", "off") or "off").lower()
+    if value not in ("on", "off"):
+        raise ConfigError(f"CREWOPS_NEBIUS_REASONING must be on or off, got {value!r}")
+    return value == "on"
 
 
 def _base_url(env: Mapping[str, str]) -> str:
@@ -264,6 +273,9 @@ class Settings:
     """The stack only turns this on when the notifier ships the MCP package, because that's
     the one bundling ``cryptography`` for web push."""
     nebius_base_url: str = DEFAULT_NEBIUS_BASE_URL
+    nebius_reasoning: bool = False
+    """Let the chat models think before they answer. Off: the roles want short, direct
+    replies within the voice budget, and thinking tokens are billed."""
     """Token Factory's OpenAI-compatible API. The key is never a setting: it comes from
     ``NEBIUS_API_KEY`` locally or from Parameter Store (``nebius_api_key_parameter``)."""
 
@@ -411,6 +423,7 @@ class Settings:
             escalation_role_arn=_get(env, "CREWOPS_ESCALATION_ROLE_ARN"),
             push_enabled=_get(env, "CREWOPS_PUSH_ENABLED") == "1",
             nebius_base_url=_base_url(env),
+            nebius_reasoning=_reasoning(env),
         )
 
 
