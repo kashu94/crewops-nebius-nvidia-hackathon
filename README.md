@@ -738,8 +738,8 @@ Setting it up, once:
    the same values on the console's Account Linking page (authorization code grant, HTTP
    Basic, scopes `openid` and `profile`).
 4. Put the Alexa stack's `SkillEndpointUrl` in `alexa/skill-package/skill.json` (both
-   endpoint `uri` values; the committed ones are our own deployment's), and import the manifest and the interaction models in
-   the console (or deploy them with the ASK CLI). The endpoint uses the "wildcard
+   `REPLACE_WITH_SkillEndpointUrl` values), and import the manifest and the interaction
+   models in the console (or deploy them with the ASK CLI). The endpoint uses the "wildcard
    certificate" option.
 5. On the skill's Permissions page, switch on Alexa Notifications and Reminders, note
    the Login with Amazon client id and secret (Alexa Skill Messaging), and store them where
