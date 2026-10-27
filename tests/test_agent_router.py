@@ -100,6 +100,13 @@ def test_unusable_triage_falls_back_to_a_lookup(reply):
     assert decided.decided_by == "default" and decided.intent is Intent.LOOKUP_CREW
 
 
+def test_triage_can_say_a_question_is_not_crew_control():
+    router = Router(vocab(), examples(), triage=lambda i, q: '{"intent": "NONE"}')
+    decided = router.route("Translate good morning into Hindi.")
+    assert decided.decided_by == "default" and decided.confidence is Confidence.LOW
+    assert decided.notes == ["triage: not a crew-control question"] and decided.off_topic
+
+
 def test_triage_failure_falls_back_to_a_lookup():
     def boom(instructions, q):
         raise TimeoutError

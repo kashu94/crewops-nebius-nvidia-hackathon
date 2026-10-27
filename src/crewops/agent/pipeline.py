@@ -272,8 +272,9 @@ class Pipeline:
 
         # Only ask the model when the planned calls produced nothing usable. Otherwise the
         # template says exactly what they returned, and a model's extra conclusion (no id or
-        # number in it) could slip past the verifier.
-        wants_model = not any(e.ok for e in trace)
+        # number in it) could slip past the verifier. Nor when triage said the question isn't
+        # about crew control: there is nothing for the advisor to look up.
+        wants_model = not any(e.ok for e in trace) and not route.off_topic
         if not trace and (seat := self._which_seat(route)):
             # the asker says which seat, never a model
             return Answer(question, seat, route, source="clarify", awaiting="detail", notes=notes)
@@ -296,6 +297,8 @@ class Pipeline:
                     return self._finish(question, draft, route, trace, checked, "model", notes)
                 elif checked.ok:
                     notes.append("model draft stated no sourced fact; not used")
+                elif not checked.unsupported:
+                    notes.append("model draft used no tool result; not used")
                 else:
                     # unsourced values only go to the log, they could be anything
                     log.info("model draft rejected: %s", checked.summary())

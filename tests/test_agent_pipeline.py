@@ -127,6 +127,16 @@ def test_an_unverified_draft_falls_back():
     assert "model draft rejected" in answer.notes[0]
 
 
+def test_a_draft_with_no_tool_result_says_so():
+    def drafter(question, route, trace, run, allowed):
+        return "Sorry, I can't tell from here."
+
+    answer = model_pipeline(drafter).answer(UNPLANNED, CONTROLLER)
+    assert answer.source == "clarify" and answer.notes == [
+        "model draft used no tool result; not used"
+    ]
+
+
 def test_a_failing_model_never_costs_the_answer():
     def drafter(question, route, trace, run, allowed):
         raise TimeoutError
@@ -235,6 +245,19 @@ def test_every_paraphrase_and_off_topic_answer_verifies(pipeline):
 def test_off_topic_never_looks_up_people(pipeline, question):
     answer = ask(pipeline, question)
     assert answer.text == SCOPE and answer.trace == []
+
+
+def test_off_topic_after_triage_gets_the_scope_without_the_advisor():
+    drafts = []
+
+    def drafter(*args):
+        drafts.append(args)
+        return ""
+
+    router = Router(vocab(), examples(), triage=lambda i, q: '{"intent": "NONE"}')
+    pipeline = Pipeline(tools(), router, drafter=drafter)
+    answer = pipeline.answer("Translate good morning into Hindi.", CONTROLLER)
+    assert answer.text == SCOPE and answer.trace == [] and drafts == []
 
 
 def test_second_round_planner_findings(pipeline):

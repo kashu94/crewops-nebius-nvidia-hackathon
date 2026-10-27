@@ -103,6 +103,7 @@ export default function Login() {
             A sick call or a closed gate becomes ranked, legal cover within seconds, on the desk, on Alexa and on the
             ops-room wall. A second person approves every roster change.
           </p>
+          <p className="mt-2 text-xs text-[#b9c6d6]">Answers by NVIDIA Nemotron on Nebius Token Factory.</p>
           <p className="mt-10 text-sm font-medium text-white">Every cover is checked against seven rules</p>
           <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2 rounded-lg bg-[#040a18]/55 p-4 text-sm ring-1 ring-white/10">
             {RULES.map(([name, text]) => (

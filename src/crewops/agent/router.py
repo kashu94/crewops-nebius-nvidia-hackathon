@@ -300,6 +300,8 @@ class Route:
     matched: str | None = None
     """Rule name or example question id that decided."""
     notes: list[str] = field(default_factory=list)
+    off_topic: bool = False
+    """Triage said the question isn't about crew control: no tool or model should run."""
 
     @property
     def tier(self) -> Tier:
@@ -378,7 +380,9 @@ Intents:
 
 Ids are already extracted; classify only the kind of question. A question that states no
 disruption or action is a lookup: never invent a scenario the user did not describe.
+A question that is not about crew control at all is {"intent": "NONE", "confidence": "high"}.
 """
+NOT_CREW_CONTROL = "NONE"
 
 Triage = Callable[[str, str], str]
 """(instructions, question) -> the model's raw reply."""
@@ -452,7 +456,18 @@ class Router:
         try:
             raw = self.triage(TRIAGE_INSTRUCTIONS, text)  # type: ignore[misc]
             payload = json.loads(_json_part(raw))
-            intent = Intent(str(payload["intent"]).strip().upper())
+            name = str(payload["intent"]).strip().upper()
+            if name == NOT_CREW_CONTROL:
+                # nothing to look up: the pipeline answers with what it can help with
+                return Route(
+                    Intent.LOOKUP_CREW,
+                    ents,
+                    Confidence.LOW,
+                    "default",
+                    notes=["triage: not a crew-control question"],
+                    off_topic=True,
+                )
+            intent = Intent(name)
             confidence = Confidence(str(payload.get("confidence", "medium")).strip().lower())
         except Exception as exc:  # any failure falls back to a lookup, with the reason
             return Route(
