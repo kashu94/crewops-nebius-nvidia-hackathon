@@ -58,7 +58,7 @@ Factory. Everything that stores, searches, secures or hosts stays on AWS.
 
 | Role | Model | Served by | What it does |
 |---|---|---|---|
-| Triage | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | Classifies a question that neither the router's rules nor its semantic match could place. No tools; one JSON intent back. |
+| Triage | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | Classifies a question that neither the router's rules nor its semantic match could place. No tools; one JSON intent back, or "not crew control", which gets the scope reply with no tool or advisor call. |
 | Advisor | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | The tool-calling loop: sees the planned tool results as its own earlier calls, calls more read-only tools through the caller's role checks (OpenAI-style function calling), and drafts the answer. |
 | Explainer | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | Rewrites a verified answer for speech. The rewrite is verified again. |
 | Embeddings | Titan Text Embeddings V2 | Amazon Bedrock | Hybrid search over rules, example questions and past scenarios (S3 Vectors). |
@@ -231,7 +231,7 @@ target account before calling the latest CDK CLI. The CLI must be at least as ne
 version mismatch". On Windows, run the same settings directly:
 
 ```powershell
-$env:AWS_PROFILE="crewops"; $env:AWS_REGION="ap-southeast-2"; $env:CREWOPS_STAGE="dev"
+$env:AWS_PROFILE="crewops"; $env:AWS_REGION="ap-southeast-2"; $env:CREWOPS_STAGE="nebius"
 npx --yes aws-cdk@latest deploy --all --profile crewops
 ```
 
@@ -245,7 +245,7 @@ without a Nebius key the assistant still answers, from rules and templates alone
 |---|---|---|
 | `AWS_PROFILE` | none | AWS CLI profile to deploy and run with; `default` is refused |
 | `AWS_REGION` | `ap-southeast-2` | Region for every resource |
-| `CREWOPS_STAGE` | `dev` | Prefix for resource names (`crewops-<stage>-...`) |
+| `CREWOPS_STAGE` | `dev` | Prefix for resource names (`crewops-<stage>-...`); `.env.example` sets `nebius` |
 | `NEBIUS_API_KEY` | none | Token Factory API key for local runs; deployed services read Parameter Store instead |
 | `CREWOPS_NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1/` | Token Factory's OpenAI-compatible API |
 | `CREWOPS_NEBIUS_REASONING` | `off` | `on` lets the models think before answering: slower, and the thinking tokens are billed |
@@ -283,7 +283,7 @@ environment variable or a file. Store it once per stage, before or after deployi
 
 ```bash
 read -rs NEBIUS_API_KEY   # paste the key; it is not echoed or kept in shell history
-aws ssm put-parameter --name /crewops-dev/nebius/api-key --type SecureString \
+aws ssm put-parameter --name /crewops-nebius/nebius/api-key --type SecureString \
   --value "$NEBIUS_API_KEY" --profile crewops
 ```
 
@@ -340,7 +340,7 @@ uv run python -m crewops.ingestion.load_seed --replace   # dev/test: start from 
 ### Uploading roster changes
 
 Admins change the operation by uploading a JSON file to the roster bucket (its name is in the
-`CrewOps-dev-Ingestion` stack outputs). The file holds any of the operation's collections in
+`CrewOps-nebius-Ingestion` stack outputs). The file holds any of the operation's collections in
 the same shapes as the seed files, for example `{"pairings": [...]}`; the seed's
 `rosters.json` and `rules.json` can be uploaded as they are.
 
@@ -477,7 +477,7 @@ package is built first (it downloads ARM64 wheels; no Docker needed), then deplo
 
 ```bash
 uv run python -m crewops.mcp.package            # builds build/mcp_server
-scripts/cdk.sh deploy CrewOps-dev-Ingestion CrewOps-dev-Notify CrewOps-dev-Mcp
+scripts/cdk.sh deploy CrewOps-nebius-Ingestion CrewOps-nebius-Notify CrewOps-nebius-Mcp
 ```
 
 Until the package is built, the CDK app leaves the MCP stack out and says so, so the other
@@ -728,7 +728,7 @@ Setting it up, once:
 
    ```bash
    uv run python -m crewops.mcp.package
-   scripts/cdk.sh deploy CrewOps-dev-Auth CrewOps-dev-Notify CrewOps-dev-Alexa
+   scripts/cdk.sh deploy CrewOps-nebius-Auth CrewOps-nebius-Notify CrewOps-nebius-Alexa
    ```
 
 3. Copy `alexa/account-linking.template.json` to `alexa/account-linking.json` (git-ignored)
@@ -746,8 +746,8 @@ Setting it up, once:
    the notifier reads them, never in a file:
 
    ```bash
-   aws ssm put-parameter --name /crewops-dev/alexa/client-id --type String --value <id> --profile crewops
-   aws ssm put-parameter --name /crewops-dev/alexa/client-secret --type SecureString --value <secret> --profile crewops
+   aws ssm put-parameter --name /crewops-nebius/alexa/client-id --type String --value <id> --profile crewops
+   aws ssm put-parameter --name /crewops-nebius/alexa/client-secret --type SecureString --value <secret> --profile crewops
    ```
 
 6. In the Alexa app: Skills > Your Skills > Dev > CrewOps: enable it, link your CrewOps

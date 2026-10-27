@@ -245,7 +245,7 @@ def test_env_example_loads_as_documented(private_environ):
     example = Path(__file__).resolve().parents[1] / ".env.example"
     load_env_file(example)
     s = Settings.from_env()
-    assert s.stage == "dev" and s.guardrails_enabled is False
+    assert s.stage == "nebius" and s.guardrails_enabled is False
 
 
 def test_nebius_reasoning_is_off_by_default_and_on_or_off_only():
