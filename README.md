@@ -1,8 +1,8 @@
 # CrewOps
 
 A voice-first agent for airline crew control, built for Alexa+ on the Model Context
-Protocol. Its model layer is **NVIDIA Llama-3.1-Nemotron-70B-Instruct served by Nebius
-Token Factory**; its backend runs on AWS.
+Protocol. Its model layer is **NVIDIA Nemotron 3.5 Lightning served by Nebius Token
+Factory**; its backend runs on AWS.
 
 Built for the [Nebius x NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com/).
 See [Nebius x NVIDIA: what runs where](#nebius-x-nvidia-what-runs-where).
@@ -58,9 +58,9 @@ Factory. Everything that stores, searches, secures or hosts stays on AWS.
 
 | Role | Model | Served by | What it does |
 |---|---|---|---|
-| Triage | `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF` | Nebius Token Factory | Classifies a question that neither the router's rules nor its semantic match could place. No tools; one JSON intent back. |
-| Advisor | `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF` | Nebius Token Factory | The tool-calling loop: sees the planned tool results as its own earlier calls, calls more read-only tools through the caller's role checks (OpenAI-style function calling), and drafts the answer. |
-| Explainer | `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF` | Nebius Token Factory | Rewrites a verified answer for speech. The rewrite is verified again. |
+| Triage | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | Classifies a question that neither the router's rules nor its semantic match could place. No tools; one JSON intent back. |
+| Advisor | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | The tool-calling loop: sees the planned tool results as its own earlier calls, calls more read-only tools through the caller's role checks (OpenAI-style function calling), and drafts the answer. |
+| Explainer | `nvidia/Nemotron-3_5-Lightning` | Nebius Token Factory | Rewrites a verified answer for speech. The rewrite is verified again. |
 | Embeddings | Titan Text Embeddings V2 | Amazon Bedrock | Hybrid search over rules, example questions and past scenarios (S3 Vectors). |
 | Screening | Bedrock Guardrails | Amazon Bedrock | Screens every question and answer, including prompt attacks. |
 
@@ -83,6 +83,9 @@ The model layer is made of:
 - A Token Factory client that speaks the roles' message shapes, Nemotron defaults for all
   three roles, and `python -m crewops.agent.nebius` to check a key against the live
   catalogue.
+- Thinking mode off (`enable_thinking: false`) for short, direct replies within the voice
+  budget, and an advisor whose last round may not call more tools, so it answers from what
+  it gathered.
 - Two circuit breakers, so a Token Factory outage and a Bedrock outage each pause only
   their own calls, with Token Factory 429 and 5xx counted as outages and 4xx as our fault.
 - Infrastructure that passes the Token Factory URL and model ids to the MCP server and the
@@ -142,7 +145,7 @@ Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Why each piece was ch
 | Nebius and NVIDIA | Role |
 |---|---|
 | Nebius Token Factory | Serves the chat models through its OpenAI-compatible API |
-| NVIDIA Llama-3.1-Nemotron-70B-Instruct | Triage, the tool-calling advisor and the explainer |
+| NVIDIA Nemotron 3.5 Lightning | Triage, the tool-calling advisor and the explainer |
 
 | AWS | Role |
 |---|---|
@@ -245,9 +248,10 @@ without a Nebius key the assistant still answers, from rules and templates alone
 | `CREWOPS_STAGE` | `dev` | Prefix for resource names (`crewops-<stage>-...`) |
 | `NEBIUS_API_KEY` | none | Token Factory API key for local runs; deployed services read Parameter Store instead |
 | `CREWOPS_NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1/` | Token Factory's OpenAI-compatible API |
-| `CREWOPS_ROUTER_MODEL_ID` | `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF` | Triage model (Token Factory) |
-| `CREWOPS_ADVISOR_MODEL_ID` | `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF` | Tool-calling advisor model (Token Factory) |
-| `CREWOPS_EXPLAINER_MODEL_ID` | `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF` | Answer rewriting model (Token Factory) |
+| `CREWOPS_NEBIUS_REASONING` | `off` | `on` lets the models think before answering: slower, and the thinking tokens are billed |
+| `CREWOPS_ROUTER_MODEL_ID` | `nvidia/Nemotron-3_5-Lightning` | Triage model (Token Factory) |
+| `CREWOPS_ADVISOR_MODEL_ID` | `nvidia/Nemotron-3_5-Lightning` | Tool-calling advisor model (Token Factory) |
+| `CREWOPS_EXPLAINER_MODEL_ID` | `nvidia/Nemotron-3_5-Lightning` | Answer rewriting model (Token Factory) |
 | `CREWOPS_EMBEDDING_MODEL_ID` | `amazon.titan-embed-text-v2:0` | Embeddings for search (Bedrock) |
 | `CREWOPS_EMBEDDING_DIMENSIONS` | `512` | 256, 512 or 1024 |
 | `CREWOPS_GUARDRAIL_ID` | none | Bedrock guardrail, once deployed |

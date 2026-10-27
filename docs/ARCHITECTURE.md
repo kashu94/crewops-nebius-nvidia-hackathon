@@ -25,8 +25,8 @@ choosing which tools to call, and turning a verified answer into speech.
  │  Bedrock Guardrails on input                                 │          │
  │  router → [triage] → planner → advisor tool loop → verifier  │          │
  │  → explainer → PII redaction → Bedrock Guardrails on output  │          │
- │  triage · advisor · explainer: NVIDIA Nemotron 70B on Nebius │          │
- │  Token Factory (OpenAI-compatible API, key in Param. Store)  │          │
+ │  triage · advisor · explainer: NVIDIA Nemotron 3.5 Lightning │          │
+ │  on Nebius Token Factory (OpenAI-compatible API, key in SSM) │          │
  │  AgentCore Memory: each conversation's previous turn         │          │
  └──────────────────────────────┬──────────────────────────────┘          │
                                 │ MCP client                              │
@@ -79,14 +79,14 @@ speech and is discarded unless it keeps every fact.
 | Rule questions | 0 | "What's the FDP limit" or "how much rest does crew need", naming no one, goes to that rule's current text; "what are the rules" lists all seven. |
 | Router | 0 | Ordered regex rules classify the question; ids, dates and stations are extracted by pattern only. |
 | Semantic fallback | 0 | Embedding match against the example questions. Borrows the closest one's intent, never its ids or answer, and only above a similarity floor measured on paraphrases. |
-| Triage | 0–1 (Nemotron 70B on Nebius) | Classifies intent only when both stages above abstain. No tools. A reply it cannot parse means a lookup. |
+| Triage | 0–1 (Nemotron 3.5 Lightning on Nebius) | Classifies intent only when both stages above abstain. No tools. A reply it cannot parse means a lookup. |
 | Whose records | 0 | "My" means the asker. Crew may look up their own profile, certificates and trips. Anyone else asking about "my certificate" or "my duty" is told they are not on the crew roster, rather than shown everyone's; a certificate question naming no one, no kind and no horizon is asked back. |
 | Premise check | 0 | Something the question states that the roster contradicts ("FO C-1042" for a captain, an unknown station) is asked about before anything runs. |
 | Planner | 0 | Makes the obvious first tool calls for the intent, and the calls that follow from their results, with the caller's own role checks. |
-| Advisor | 0–9 (Nemotron 70B on Nebius) | Consulted only when the planned calls produced nothing usable (the question named no exact ids, or every planned call failed). It sees the planned results as its own earlier calls, calls more through the caller's role checks, and drafts the answer, which must state at least one sourced fact. At most 8 rounds of tool calls, with the time budget checked before each model call; each call has one attempt and a firm timeout. Only a finished reply counts: a cut-off or filtered one is no answer. Cannot submit, approve or commit anything. |
+| Advisor | 0–9 (Nemotron 3.5 Lightning on Nebius) | Consulted only when the planned calls produced nothing usable (the question named no exact ids, or every planned call failed). It sees the planned results as its own earlier calls, calls more through the caller's role checks, and drafts the answer, which must state at least one sourced fact. At most 8 rounds of tool calls, with the time budget checked before each model call; each call has one attempt and a firm timeout. Only a finished reply counts: a cut-off or filtered one is no answer. Cannot submit, approve or commit anything. |
 | Verifier | 0 | Every id, number, time, name and rule verdict in the draft must appear in a tool result of the same turn. On failure the draft is replaced by the template. |
 | Template | 0 | The tool results as short sentences. Copied, never computed, so it always verifies. |
-| Explainer | 0–1 (Nemotron 70B on Nebius) | Rewrites a judgement answer (tier 2 and 3) for speech, while half the time budget remains. The rewrite must pass the verifier and keep every id, time and number of the template, or the template stands. |
+| Explainer | 0–1 (Nemotron 3.5 Lightning on Nebius) | Rewrites a judgement answer (tier 2 and 3) for speech, while half the time budget remains. The rewrite must pass the verifier and keep every id, time and number of the template, or the template stands. |
 | PII redaction | 0 | Removes contact and government-id data at the output boundary, after verification. |
 | Guardrail on output | 0 | Bedrock Guardrails screens the final answer. |
 

@@ -54,25 +54,68 @@ Entries in section 4 are about our own code, so they use a shorter form:
 
 ## 0. Nebius Token Factory and NVIDIA Nemotron
 
-### FL-222: The Nemotron 70B model id and its tool-calling support are not in the public docs
+### FL-222: The model we planned on was not served, and the docs did not say so
 
-- Date: 2026-10-13
-- Service / tool: Nebius Token Factory documentation
-- Severity: Low
+- Date: 2026-10-13, resolved 2026-10-27
+- Service / tool: Nebius Token Factory documentation and model catalogue
+- Severity: Medium
 - Task attempted: Point the three model roles at NVIDIA Llama-3.1-Nemotron-70B-Instruct on
   Token Factory, with function calling for the advisor.
-- Steps taken: Read the Token Factory API reference and quickstart, and searched the docs
-  for the model.
+- Steps taken: Read the Token Factory API reference and quickstart; once a key existed, ran
+  `python -m crewops.agent.nebius`, which compares the configured models with the key's
+  catalogue (`GET /v1/models`).
 - Expected: The served model ids, and which of them accept `tools`, listed in the docs.
 - Actual: The API reference shows the base URL (`https://api.tokenfactory.nebius.com/v1/`)
-  and Llama example ids only; neither the Nemotron id nor per-model tool-calling support
-  could be confirmed without calling the API.
-- Workaround: The model ids are settings defaulting to
-  `nvidia/Llama-3.1-Nemotron-70B-Instruct-HF`, and `python -m crewops.agent.nebius` lists
-  the key's catalogue (`GET /v1/models`) and says whether each configured model is served.
-  If the advisor's tool call is refused, the pipeline answers from the template.
-- Suggestion: A model catalogue page in the docs with each id, context length and whether
-  it supports function calling.
+  and Llama example ids only. The catalogue check printed `NOT SERVED` for the 70B model
+  and listed five other NVIDIA models: Nemotron 3 Nano, 3.5 Lightning, 3 Super, 3.5 Super
+  VL and 3 Ultra.
+- Workaround: `GET /v1/models?verbose=true` gives each model's price, context length and
+  features (all five support tools). Measured on the real advisor loop, Nemotron 3.5
+  Lightning was the cheapest and fastest; it is now the default for all three roles.
+- Suggestion: A model catalogue page in the docs with each id, price and supported
+  features, the same as the verbose endpoint returns.
+
+### FL-223: Nemotron 3 models think by default, and the switch is undocumented
+
+- Date: 2026-10-27
+- Service / tool: Nebius Token Factory, Nemotron 3 Nano and 3.5 Lightning
+- Severity: Medium
+- Task attempted: Get a short, direct reply within the voice budget, and keep triage within
+  its 100-token reply limit.
+- Steps taken: Sent "Reply with the single word OK." three ways: as it is, with
+  `/no_think` in the system prompt, and with `chat_template_kwargs: {"enable_thinking":
+  false}`.
+- Expected: A two-token reply; or, if thinking is on, a documented way to turn it off.
+- Actual: As it is, the reply cost 146 output tokens (the thinking comes back in a separate
+  field and is billed) and took up to 8 seconds. `/no_think` changed nothing.
+  `enable_thinking: false` gave 2 tokens in 0.8 seconds, but it is not in the model's
+  `supported_sampling_parameters`.
+- Workaround: Every request sends `enable_thinking: false`, unless
+  `CREWOPS_NEBIUS_REASONING=on`.
+- Suggestion: List the thinking switch with each model's parameters, and say whether thinking
+  is on by default.
+
+### FL-224: The advisor gathered instead of answering, and once wrote a tool call as text
+
+- Date: 2026-10-27
+- Service / tool: Nemotron 3.5 Lightning in the advisor's tool loop
+- Severity: Medium
+- Task attempted: Answer "Which single flight leg has the most seats at risk if cancelled,
+  and why?" within the six-second budget.
+- Steps taken: Traced each round's tool calls and token counts.
+- Expected: One sorted lookup, then an answer.
+- Actual: The model paged through flights a day at a time (110,000 input tokens over six
+  calls, no answer). With a rule asking for sort and limit, it made one sorted lookup but
+  then kept calling `ripple` for each aircraft until the round limit. When the last round
+  was sent with `tool_choice: "none"`, it once replied with its own `<tool_call>` syntax as
+  text.
+- Workaround: A rule in the advisor's instructions to keep calls few and narrow; a last
+  round with `tool_choice: "none"` and an explicit "answer now"; a reply whose text holds
+  tool-call syntax counts as no answer. The same question then got a written answer in 5.6
+  seconds for about $0.002 (the verifier still holds back any claim no tool result
+  supports).
+- Suggestion: Honour `tool_choice: "none"` in the chat template, so the model is never asked
+  for a call it may not make.
 
 ## 1. Amazon ecosystem (Alexa, Bedrock and Nova, AgentCore, MCP, Vega, Kiro)
 

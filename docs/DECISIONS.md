@@ -77,11 +77,19 @@ Function URL without code changes if AgentCore blocks progress.
 ## D6. Models: NVIDIA Nemotron on Nebius Token Factory
 
 The rules engine does the hard reasoning; the model only chooses tools and phrases answers,
-and the verifier rejects anything it did not get from a tool. NVIDIA
-Llama-3.1-Nemotron-70B-Instruct, served by Nebius Token Factory, runs all three roles:
-triage, the advisor's tool loop and the explainer. It is an open model tuned for helpful,
-instruction-following answers, and Token Factory serves it behind an OpenAI-compatible API
-with function calling, so no GPU of our own is needed.
+and the verifier rejects anything it did not get from a tool. NVIDIA Nemotron 3.5
+Lightning, served by Nebius Token Factory, runs all three roles: triage, the advisor's tool
+loop and the explainer. It is an open 30B mixture-of-experts model with 3B active parameters,
+made for agentic tool use, and Token Factory serves it behind an OpenAI-compatible API with
+function calling, so no GPU of our own is needed.
+
+It was chosen by measurement among the NVIDIA models the key can use. At $0.06 per million
+input tokens and $0.24 per million output, it is the cheapest with tool calling, and it
+answered each round in one to two seconds. Nemotron 3 Super (120B) cost five times as much
+and ran out of the six-second voice budget in the same test. Its thinking mode is turned off
+(`enable_thinking: false`), since the roles need short, direct replies and thinking tokens
+are billed. The advisor's last round may not call more tools, so it answers from what it has
+gathered rather than being cut off.
 
 The roles speak Bedrock Converse's message shapes (content blocks, tool use and tool
 results, stop reasons, usage). A small client (`crewops.agent.nebius`) translates them to

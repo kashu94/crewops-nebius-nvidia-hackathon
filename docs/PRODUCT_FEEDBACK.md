@@ -11,7 +11,7 @@ cited as FL-nnn.
 | Tool | Used for | Build again? |
 |---|---|---|
 | Nebius Token Factory | Serving the chat models through its OpenAI-compatible API | _To fill in after live runs_ |
-| NVIDIA Llama-3.1-Nemotron-70B-Instruct | Triage, the tool-calling advisor and the explainer | _To fill in after live runs_ |
+| NVIDIA Nemotron 3.5 Lightning | Triage, the tool-calling advisor and the explainer | _To fill in after live runs_ |
 | Model Context Protocol (spec 2025-11-25) and the MCP Python SDK | The CrewOps server: 35 tools over Streamable HTTP | Yes |
 | Agent Skills | The CrewOps crew-control skill | Yes |
 | Alexa Skills Kit, Proactive Events, Skill Messaging, Reminders, ASK CLI / SMAPI | The CrewOps Alexa skill: questions by voice, and a chime plus spoken alert when a disruption reaches a desk | Yes, with reservations |
@@ -40,18 +40,23 @@ function calling for the advisor's read-only tools. The key lives in AWS Paramet
   translation layer, not a rewrite: one small client (`crewops.agent.nebius`) with plain `urllib`, so the MCP
   package and the Lambda ship no new dependency.
 - Standard Bearer-token auth and a `/v1/models` endpoint, which let us add a one-command
-  check that a key can use the configured models.
+  check that a key can use the configured models. With `?verbose=true` it also gives each
+  model's price, context length and supported features (tools, reasoning), which made the
+  model choice a measurement rather than a guess.
+- Turning thinking off with `chat_template_kwargs: {"enable_thinking": false}` works and
+  cut a short reply from about 150 billed tokens to 2.
 
 **What needs work.**
-- The public API reference names only Llama example models; we could not confirm the
-  Nemotron 70B model id, or which models support function calling, from the docs alone
-  (FL-222).
+- The public API reference names only Llama example models. The model we first planned on
+  (Llama-3.1-Nemotron-70B-Instruct) turned out not to be served to our key (FL-222).
+- Thinking is on by default for the Nemotron 3 models, and the switch that turns it off is
+  not listed in the model's supported parameters (FL-223).
 
 **Onboarding.** _To fill in: credits activation, getting the key, first call._
 
 **Build again?** _To fill in after the live evaluation._
 
-## NVIDIA Llama-3.1-Nemotron-70B-Instruct
+## NVIDIA Nemotron 3.5 Lightning
 
 **Used for.** All three model roles. Triage classifies a question the router's rules and
 semantic match could not place (JSON intent, no tools). The advisor runs the tool loop
@@ -59,11 +64,15 @@ over read-only crew-control tools and drafts an answer. The explainer rewrites v
 answers for speech. Every draft and rewrite is checked by the deterministic verifier
 against the tool results before anyone hears it.
 
-**What worked well.** _To fill in after live runs: tool-choice quality, answers the verifier
-accepted, latency within the 6-second voice budget._
+**What worked well.** One to two seconds per call, cheap enough that a $25 credit covers
+thousands of questions, and dependable tool calls. Triage and the explainer worked first
+time. _To add after more live runs: answers the verifier accepted, latency on the deployed
+service._
 
-**What needs work.** _To fill in after live runs: for example, invented figures the verifier
-rejected, or malformed tool calls._
+**What needs work.** Left alone, the advisor gathered rather than concluded: it paged
+through rows instead of using the lookup's sort and limit, and kept calling tools until the
+round limit. When told not to call tools, it once wrote its own tool-call syntax as text
+(FL-224). A prompt rule and a final no-tools round fixed both. _To add after more live runs._
 
 **Build again?** _To fill in._
 
