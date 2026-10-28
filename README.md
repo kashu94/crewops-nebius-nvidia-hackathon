@@ -656,7 +656,7 @@ The browser calls no AWS API except the live-events socket. The app's server for
 action to the MCP server as the signed-in user, so every role rule is the server's. Voice
 input uses the browser's speech recognition (Chrome or Edge); elsewhere, type.
 
-The app is hosted on AWS Amplify at https://dev.d2ibbbc4686wno.amplifyapp.com, built from the
+The app is hosted on AWS Amplify (the address is on the submission page), built from the
 `dev` branch by `amplify.yml` (Node 20, root `web/`). The Amplify console holds the same
 `CREWOPS_*` variables as `web/.env.local` (without `AWS_PROFILE`); the build copies them into
 `.env.production`, because Amplify passes console variables to the build, not to the running

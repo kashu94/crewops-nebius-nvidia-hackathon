@@ -1,9 +1,9 @@
 schema-version = 1
 
 [package]
-title = "CrewOps Ops Board"
+title = "CrewOps Ops Board (Nebius)"
 version = "0.1.0"
-id = "com.crewops.tv"
+id = "com.crewops.tv.nebius"
 
 [os.version]
 min = "1.2"
@@ -19,7 +19,7 @@ id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
 
 [components]
 [[components.interactive]]
-id = "com.crewops.tv.main"
+id = "com.crewops.tv.nebius.main"
 runtime-module = "/com.amazon.kepler.runtime.react_native_kepler_4@IReactNativeKepler_0"
 launch-type = "singleton"
 categories = ["com.amazon.category.main"]

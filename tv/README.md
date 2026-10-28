@@ -5,7 +5,7 @@ the most serious and escalated disruptions first, each desk's load, reserve cove
 and base, and today's operation at a glance. The remote's D-pad moves between disruptions,
 OK opens one, and the desk buttons filter the board to one desk or show all of them.
 
-It is a React Native app for Vega OS (Fire TV), package `com.crewops.tv`. It only reads.
+It is a React Native app for Vega OS (Fire TV), package `com.crewops.tv.nebius`. It only reads.
 Every 10 seconds it fetches the web app's `/api/tv/board`, which calls the MCP server's
 `ops_board` tool as the speaker device, so nobody signs in on the TV. If a read fails, the
 last board stays on screen marked stale rather than going blank.
@@ -34,7 +34,7 @@ npm install
 npm run build:debug
 vega virtual-device start
 vega device start-port-forwarding --port 3000 --forward false
-vega run-app build/x86_64-debug/crewopstv_x86_64.vpkg com.crewops.tv.main -d VirtualDevice
+vega run-app build/x86_64-debug/crewopstv_x86_64.vpkg com.crewops.tv.nebius.main -d VirtualDevice
 ```
 
 Port forwarding lets the virtual device reach `localhost:3000` on the laptop. Run it again
