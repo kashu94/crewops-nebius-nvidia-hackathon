@@ -32,24 +32,25 @@ const CITY = [
 
 /** Out-of-focus lights: left %, top %, size px, colour, drift seconds, delay seconds. */
 const BOKEH = [
-  [8, 18, 90, "amber", 26, 0],
-  [22, 62, 54, "sky", 31, 4],
-  [34, 30, 120, "white", 34, 9],
-  [47, 74, 70, "amber", 28, 2],
-  [58, 14, 64, "sky", 36, 6],
-  [66, 48, 110, "amber", 30, 12],
-  [78, 26, 46, "white", 24, 3],
-  [86, 66, 96, "sky", 33, 8],
-  [14, 84, 60, "white", 29, 14],
-  [92, 10, 72, "amber", 35, 5],
-  [40, 90, 84, "sky", 27, 11],
-  [72, 86, 52, "white", 32, 1],
+  [8, 18, 90, "lime", 26, 0],
+  [22, 62, 54, "mint", 31, 4],
+  [34, 30, 120, "pale", 34, 9],
+  [47, 74, 70, "lime", 28, 2],
+  [58, 14, 64, "mint", 36, 6],
+  [66, 48, 110, "lime", 30, 12],
+  [78, 26, 46, "pale", 24, 3],
+  [86, 66, 96, "mint", 33, 8],
+  [14, 84, 60, "pale", 29, 14],
+  [92, 10, 72, "lime", 35, 5],
+  [40, 90, 84, "mint", 27, 11],
+  [72, 86, 52, "pale", 32, 1],
 ] as const;
 
+// a hint of green, for the NVIDIA and Nebius models behind the answers
 const TINT: Record<string, string> = {
-  amber: "rgba(251, 191, 36, 0.32)",
-  sky: "rgba(125, 211, 252, 0.28)",
-  white: "rgba(255, 255, 255, 0.22)",
+  lime: "rgba(118, 185, 0, 0.34)",
+  mint: "rgba(52, 168, 96, 0.3)",
+  pale: "rgba(190, 236, 170, 0.24)",
 };
 
 export function NightApproach() {
@@ -63,7 +64,7 @@ export function NightApproach() {
         {/* Aurora: three slow light fields. */}
         <div className="aurora aurora-a absolute -left-1/4 -top-1/4 h-[70%] w-[90%] rounded-full bg-sky-500/25 blur-[90px]" />
         <div className="aurora aurora-b absolute -right-1/4 top-[5%] h-[60%] w-[80%] rounded-full bg-indigo-500/25 blur-[100px]" />
-        <div className="aurora aurora-c absolute left-[10%] top-[20%] h-[45%] w-[70%] rounded-full bg-teal-400/15 blur-[110px]" />
+        <div className="aurora aurora-c absolute left-[10%] top-[20%] h-[45%] w-[70%] rounded-full bg-emerald-500/20 blur-[110px]" />
 
         {/* The runway on final approach. */}
         <svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 h-full w-full">
@@ -86,9 +87,9 @@ export function NightApproach() {
               <stop offset="1" stopColor="#020611" stopOpacity="0.85" />
             </linearGradient>
             <linearGradient id="edge" gradientUnits="userSpaceOnUse" x1="0" y1={HORIZON} x2="0" y2={NEAR}>
-              <stop offset="0" stopColor="#fef3c7" stopOpacity="0" />
-              <stop offset="0.16" stopColor="#fef3c7" stopOpacity="0" />
-              <stop offset="1" stopColor="#fef3c7" stopOpacity="0.18" />
+              <stop offset="0" stopColor="#d4f0b0" stopOpacity="0" />
+              <stop offset="0.16" stopColor="#d4f0b0" stopOpacity="0" />
+              <stop offset="1" stopColor="#d4f0b0" stopOpacity="0.18" />
             </linearGradient>
           </defs>
           <polygon
@@ -114,15 +115,15 @@ export function NightApproach() {
           <g filter="url(#glow)">
             {depth.map((s, i) => (
               <g key={i}>
-                <circle cx={CX - SPREAD * s} cy={y(s)} r={0.4 + 4.2 * s} fill="#fef3c7" opacity={fade(s)} />
-                <circle cx={CX + SPREAD * s} cy={y(s)} r={0.4 + 4.2 * s} fill="#fef3c7" opacity={fade(s)} />
+                <circle cx={CX - SPREAD * s} cy={y(s)} r={0.4 + 4.2 * s} fill="#e2f5c4" opacity={fade(s)} />
+                <circle cx={CX + SPREAD * s} cy={y(s)} r={0.4 + 4.2 * s} fill="#e2f5c4" opacity={fade(s)} />
                 {/* the group carries the fade: the flashing animation sets the light's own opacity */}
                 <g opacity={fade(s)}>
                   <circle
                     cx={CX}
                     cy={y(s)}
                     r={0.3 + 3.1 * s}
-                    fill="#e0f2fe"
+                    fill="#e3fbe8"
                     className="lead-in"
                     style={{ animationDelay: `${i * 0.03}s` }}
                   />

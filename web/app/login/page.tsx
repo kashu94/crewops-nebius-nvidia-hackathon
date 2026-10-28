@@ -88,12 +88,18 @@ export default function Login() {
       <section className="relative hidden flex-col justify-between overflow-hidden bg-[#040a18] px-12 py-10 text-white lg:flex">
         {/* the night approach to the runway, behind the panel's words */}
         <NightApproach />
-        <div className="relative flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-white text-[#0c2340]">
-            <Plane size={16} />
+        {/* the logo as tall as both lines beside it */}
+        <div className="relative flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-white text-[#0c2340]">
+            <Plane size={22} />
           </span>
-          <span className="text-[15px] font-semibold">CrewOps</span>
-          <span className="text-sm text-[#b9c6d6]">with Alexa+</span>
+          <div>
+            <p className="flex items-baseline gap-2.5">
+              <span className="text-[15px] font-semibold">CrewOps</span>
+              <span className="text-sm text-[#b9c6d6]">with Alexa+</span>
+            </p>
+            <p className="mt-0.5 text-xs font-medium text-[#76b900]">Powered by NVIDIA Nemotron on Nebius</p>
+          </div>
         </div>
         <div className="relative max-w-xl">
           <h2 className="text-[34px] font-semibold leading-tight tracking-[-0.01em]">
@@ -103,7 +109,6 @@ export default function Login() {
             A sick call or a closed gate becomes ranked, legal cover within seconds, on the desk, on Alexa and on the
             ops-room wall. A second person approves every roster change.
           </p>
-          <p className="mt-2 text-xs text-[#b9c6d6]">Answers by NVIDIA Nemotron on Nebius Token Factory.</p>
           <p className="mt-10 text-sm font-medium text-white">Every cover is checked against seven rules</p>
           <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2 rounded-lg bg-[#040a18]/55 p-4 text-sm ring-1 ring-white/10">
             {RULES.map(([name, text]) => (
@@ -126,12 +131,17 @@ export default function Login() {
 
       <section className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-[#0c2340] text-white">
-              <Plane size={16} />
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#0c2340] text-white">
+              <Plane size={22} />
             </span>
-            <span className="text-[15px] font-semibold">CrewOps</span>
-            <span className="text-sm text-muted">with Alexa+</span>
+            <div>
+              <p className="flex items-baseline gap-2.5">
+                <span className="text-[15px] font-semibold">CrewOps</span>
+                <span className="text-sm text-muted">with Alexa+</span>
+              </p>
+              <p className="mt-0.5 text-xs font-medium text-[#3d7a00]">Powered by NVIDIA Nemotron on Nebius</p>
+            </div>
           </div>
           {current && (
             <div className="mb-6 rounded-lg border border-line bg-sunken p-4">
