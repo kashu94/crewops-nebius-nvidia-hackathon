@@ -168,6 +168,13 @@ function Row({ r }: { r: Result }) {
   );
 }
 
+// The live run answers with NVIDIA Nemotron on Nebius Token Factory; the offline run is the
+// same questions with no model at all, the baseline the live run is measured against.
+const RUN_LABEL: Record<string, string> = {
+  live: "With NVIDIA Nemotron (live)",
+  offline: "Rules only, no model (baseline)",
+};
+
 export default function Evaluation() {
   const [reports, setReports] = useState<Record<string, Report>>({});
   const [mode, setMode] = useState<string | null>(null);
@@ -246,7 +253,7 @@ export default function Evaluation() {
           {/* A choice only when both runs exist; with one, a plain label says which it is. */}
           {Object.keys(reports).length < 2 ? (
             <p className="rounded-md bg-sunken px-3 py-1.5 text-sm text-muted">
-              {mode === "offline" ? "Rules and templates (offline run)" : "Live run (NVIDIA Nemotron on Nebius)"}
+              {RUN_LABEL[mode ?? "live"] ?? mode}
             </p>
           ) : (
             <div className="flex items-center gap-2" role="group" aria-label="Which run">
@@ -261,7 +268,7 @@ export default function Evaluation() {
                       : "bg-surface text-foreground ring-1 ring-control hover:bg-sunken"
                   }`}
                 >
-                  {m === "offline" ? "Rules and templates" : "Live (NVIDIA Nemotron on Nebius)"}
+                  {RUN_LABEL[m] ?? m}
                 </button>
               ))}
             </div>
@@ -317,7 +324,8 @@ export default function Evaluation() {
         {other && (
           <section className="rounded-lg border border-line bg-surface p-5">
             <h2 className="text-[15px] font-semibold text-foreground">
-              {mode === "live" ? "Live" : "Offline"} compared with {other}
+              {mode === "live" ? "With NVIDIA Nemotron" : "Rules only"} compared with{" "}
+              {other === "live" ? "NVIDIA Nemotron" : "the rules-only baseline"}
             </h2>
             <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
               {(
