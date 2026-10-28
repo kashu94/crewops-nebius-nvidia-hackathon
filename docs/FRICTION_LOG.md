@@ -3,7 +3,7 @@
 Problems hit while building CrewOps's model layer on Nebius Token Factory with NVIDIA
 Nemotron, each written when it happened, with the real error text and figures.
 
-Entries FL-1 to FL-4 are about Token Factory and the model. FL-5 and FL-6 are bugs in our
+Entries FL-1 to FL-3 are about Token Factory and the model. FL-4 and FL-5 are bugs in our
 own code that only showed up with the model in the loop, found by live runs, and how each
 was fixed.
 
@@ -106,28 +106,9 @@ Entries about our own code use a shorter form:
 - Suggestion: Honour `tool_choice: "none"` in the chat template, so the model is never asked
   for a call it may not make.
 
-### FL-4: The hackathon code and the credit code went in different places, after a card
-
-- Date: 2026-10-23, resolved 2026-10-27
-- Service / tool: Nebius Token Factory billing and promo codes, the hackathon sign-up
-- Severity: Low
-- Task attempted: Get the hackathon's Token Factory credits onto the account, then a key to
-  spend them.
-- Steps taken: Registered for the hackathon with the code `NEBIUS-DEVPOST-GLOBAL26`. Then
-  received, by email, a separate $25 Token Factory promo code, valid until 31/12/2026.
-  Tried the hackathon code in the console's promo-code field first.
-- Expected: One code, applied in one place, and promo credits usable without a payment card.
-- Actual: The console refused `NEBIUS-DEVPOST-GLOBAL26` as an invalid code: it belongs to the
-  registration form, not the console. The emailed code worked under Balance → Top up →
-  With promo code, but the console asked for a payment card first, and the billing docs
-  confirm a card is required before any credits.
-- Workaround: Added a card, then applied the emailed code; $25 showed on the balance.
-- Suggestion: Say on the hackathon page and in the email which code goes where, and that a
-  card is needed before promo credits apply.
-
 ## Our own code, found with the model in the loop
 
-### FL-5: Off-topic questions were answered with crew data
+### FL-4: Off-topic questions were answered with crew data
 
 - Date: 2026-10-27
 - Where: the router's triage (Nemotron 3.5 Lightning, one JSON intent, no tools) and the
@@ -144,8 +125,16 @@ Entries about our own code use a shorter form:
 - Fix: Triage may answer `NONE` ("not about crew control"), which gives the scope reply
   ("I can help with crew control: ...") with no tool and no advisor call: one call, 239
   input tokens. A draft that uses no tool result now says exactly that in its note.
+- Follow-up (2026-10-28, live evaluation): with `NONE` allowed, triage declined plain flight
+  questions ("Show me Bangalore to Mumbai flights on 15 Oct.", "What's the total number of
+  flights on 14 October?") with "triage: not a crew-control question". The instructions now
+  name flights, aircraft, airports, gates, crew, rosters, reserves, duty, certificates,
+  rules and disruptions as crew control, and keep `NONE` for questions with nothing to do
+  with the airline's operation. Both questions were then answered (2 and 21 flights), the
+  off-topic one was still declined, and the live evaluation went from 28 to 31 of 38
+  rewordings passed.
 
-### FL-6: A role refusal went to the advisor, which tried other tools
+### FL-5: A role refusal went to the advisor, which tried other tools
 
 - Date: 2026-10-28
 - Where: the question pipeline, with Nemotron as the advisor

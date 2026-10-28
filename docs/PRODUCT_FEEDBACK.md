@@ -30,8 +30,8 @@ function calling for the advisor's read-only tools. The key lives in AWS Paramet
   model choice a measurement rather than a guess.
 - Turning thinking off with `chat_template_kwargs: {"enable_thinking": false}` works and
   cut a short reply from about 150 billed tokens to 2.
-- Cost: our whole live evaluation (58 questions, 64 model calls, about 133,000 input and
-  6,000 output tokens) cost $0.0095.
+- Cost: our whole live evaluation (58 questions, 66 model calls, about 137,000 input and
+  6,500 output tokens) cost $0.0098.
 
 **What needs work.**
 - The public API reference names only Llama example models. The model we first planned on
@@ -42,9 +42,7 @@ function calling for the advisor's read-only tools. The key lives in AWS Paramet
   text (FL-3).
 
 **Onboarding.** Once we had a key, it worked on the first call with a standard Bearer
-header against the OpenAI-compatible endpoint. Getting the credits was the confusing part:
-the hackathon's registration code is not a console promo code, the $25 credit came as a
-separate emailed code, and the console needed a payment card before it would apply (FL-4).
+header against the OpenAI-compatible endpoint.
 
 ## NVIDIA Nemotron 3.5 Lightning
 
@@ -58,11 +56,11 @@ against the tool results before anyone hears it.
 - Fast and cheap: one to two seconds for a reworded answer, and a $25 credit covers
   thousands of questions. Tool calls were dependable, and triage and the explainer worked
   first time.
-- Measured on the held-out evaluation, live against the deployed data: with Nemotron, 29 of
+- Measured on the held-out evaluation, live against the deployed data: with Nemotron, 32 of
   38 reworded questions were routed right against 25 with the rules alone, and answers
-  agreed with the gold answers' facts 0.77 of the time against 0.72. No answer stated an
+  agreed with the gold answers' facts 0.85 of the time against 0.72. No answer stated an
   unsourced fact and none leaked personal data; every role, injection, follow-up and
-  clarifying-question check passed. Half the answers took under 3.3 seconds end to end,
+  clarifying-question check passed. Half the answers took under 3.2 seconds end to end,
   95% under 8.
 
 **What needs work.**
@@ -71,10 +69,11 @@ against the tool results before anyone hears it.
   told not to call tools, it once wrote its own tool-call syntax as text (FL-3). A prompt
   rule and a final no-tools round fixed both.
 - Given a closed list of intents, triage always picked one, even for an off-topic question;
-  it needs an explicit "none" choice to decline (FL-5).
+  it needs an explicit "none" choice to decline. With that choice, it then declined plain
+  flight questions too, until the instructions named what counts as the operation (FL-4).
 - When the asker's role was refused a lookup, the advisor tried to answer with other tools
   instead of stopping, once with an argument above a tool's stated maximum. We now refuse
-  without a model call (FL-6).
+  without a model call (FL-5).
 
 ## Feature requests
 
@@ -83,4 +82,3 @@ against the tool results before anyone hears it.
 | Token Factory: a model catalogue in the docs, with each served id, price and supported features | We could not confirm the Nemotron model id or its tool-calling support before calling the API (FL-1) | Important |
 | Document the thinking switch for each model, and whether thinking is on by default | Hidden thinking tokens are billed and push a voice reply past its budget (FL-2) | Important |
 | Honour `tool_choice: "none"` in the Nemotron chat template | A final round must answer, never ask for a call it may not make (FL-3) | Important |
-| One clear page on hackathon and promo credits: which code goes where, and when a card is needed | Getting the credits took two codes and a card, in two places (FL-4) | Nice-to-have |

@@ -6,7 +6,7 @@ import pytest
 from agent_fixtures import examples, paraphrases, questions, vocab
 
 from crewops.agent.intents import Confidence, Intent, Tier
-from crewops.agent.router import Router, is_bare_identifier
+from crewops.agent.router import TRIAGE_INSTRUCTIONS, Router, is_bare_identifier
 
 
 @pytest.fixture(scope="module")
@@ -105,6 +105,13 @@ def test_triage_can_say_a_question_is_not_crew_control():
     decided = router.route("Translate good morning into Hindi.")
     assert decided.decided_by == "default" and decided.confidence is Confidence.LOW
     assert decided.notes == ["triage: not a crew-control question"] and decided.off_topic
+
+
+def test_triage_instructions_count_the_operation_as_crew_control():
+    """Plain flight questions were once declined as off-topic."""
+    for word in ("Flights", "aircraft", "airports", "gates", "rosters", "disruptions"):
+        assert word in TRIAGE_INSTRUCTIONS
+    assert "nothing to do with the airline's" in TRIAGE_INSTRUCTIONS
 
 
 def test_triage_failure_falls_back_to_a_lookup():

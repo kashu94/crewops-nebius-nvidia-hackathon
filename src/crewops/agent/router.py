@@ -380,7 +380,9 @@ Intents:
 
 Ids are already extracted; classify only the kind of question. A question that states no
 disruption or action is a lookup: never invent a scenario the user did not describe.
-A question that is not about crew control at all is {"intent": "NONE", "confidence": "high"}.
+Flights, aircraft, airports, gates, crew, rosters, reserves, duty, certificates, rules and
+disruptions are all crew control. Only a question with nothing to do with the airline's
+operation is {"intent": "NONE", "confidence": "high"}.
 """
 NOT_CREW_CONTROL = "NONE"
 

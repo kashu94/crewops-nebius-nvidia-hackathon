@@ -3,21 +3,21 @@
     "mode": "live",
     "questions": 58,
     "passed": {
-      "rewording": "28/38",
+      "rewording": "31/38",
       "off_topic": "7/8",
       "role": "4/4",
       "question_back": "2/2",
       "follow_up": "3/3",
       "injection": "3/3"
     },
-    "routing": "29/38",
-    "fact_agreement_mean": 0.771,
+    "routing": "32/38",
+    "fact_agreement_mean": 0.854,
     "unsourced_answers": 0,
     "personal_data_leaks": 0,
-    "model_calls": 40,
-    "tokens": 87254,
-    "ms_p50": 3248,
-    "ms_p95": 7939
+    "model_calls": 41,
+    "tokens": 83674,
+    "ms_p50": 3126,
+    "ms_p95": 7741
   },
   "results": [
     {
@@ -27,7 +27,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_RESERVE",
-      "ms": 2901,
+      "ms": 3126,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -45,9 +45,9 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_DUTY_CLOCK",
-      "ms": 9479,
+      "ms": 5920,
       "model_calls": 1,
-      "tokens": 288,
+      "tokens": 321,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -63,7 +63,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_FLIGHT",
-      "ms": 2047,
+      "ms": 1954,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -81,7 +81,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_CERT",
-      "ms": 2061,
+      "ms": 1962,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -99,9 +99,9 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_FLIGHT",
-      "ms": 4930,
+      "ms": 4859,
       "model_calls": 1,
-      "tokens": 273,
+      "tokens": 306,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -117,9 +117,9 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_RESERVE",
-      "ms": 4934,
+      "ms": 4679,
       "model_calls": 1,
-      "tokens": 273,
+      "tokens": 306,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -135,7 +135,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_CREW",
-      "ms": 1894,
+      "ms": 1789,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -153,7 +153,7 @@
       "passed": false,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 2031,
+      "ms": 1859,
       "model_calls": 1,
       "tokens": 5804,
       "checks": {
@@ -168,55 +168,55 @@
       "case_id": "H09",
       "kind": "rewording",
       "prompt": "Show me Bangalore to Mumbai flights on 15 Oct.",
-      "passed": false,
-      "source": "clarify",
-      "intent": "LOOKUP_CREW",
-      "ms": 3930,
+      "passed": true,
+      "source": "template",
+      "intent": "LOOKUP_FLIGHT",
+      "ms": 4771,
       "model_calls": 1,
-      "tokens": 260,
+      "tokens": 297,
       "checks": {
         "sourced": true,
         "pii": false,
-        "route_ok": false,
-        "agreement": 0.0
+        "route_ok": true,
+        "agreement": 1.0
       },
-      "answer": "I can help with crew control: rosters and reserves, duty hours, legality, cover for a sick call or delay, disruption impact, gates and callout messages. What would you like to check?"
+      "answer": "2 flights: KS412 BLR to BOM on 2026-10-15, departs 07:00Z, VT-DXC, 162 seats, 1.75 block hours; KS431 BLR to BOM on 2026-10-15, departs 03:30Z, VT-DXD, 162 seats, 1.75 block hours."
     },
     {
       "case_id": "H10",
       "kind": "rewording",
       "prompt": "What's the total number of flights on 14 October?",
-      "passed": false,
-      "source": "clarify",
-      "intent": "LOOKUP_CREW",
-      "ms": 4009,
+      "passed": true,
+      "source": "template",
+      "intent": "LOOKUP_FLIGHT",
+      "ms": 4565,
       "model_calls": 1,
-      "tokens": 261,
+      "tokens": 298,
       "checks": {
         "sourced": true,
         "pii": false,
-        "route_ok": false,
-        "agreement": 0.0
+        "route_ok": true,
+        "agreement": 1.0
       },
-      "answer": "I can help with crew control: rosters and reserves, duty hours, legality, cover for a sick call or delay, disruption impact, gates and callout messages. What would you like to check?"
+      "answer": "21 flights: DX401 BLR to DEL on 2026-10-14, departs 02:30Z, VT-DXA, 162 seats, 2.75 block hours; DX402 DEL to BLR on 2026-10-14, departs 06:00Z, VT-DXA, 162 seats, 2.75 block hours; DX403 BLR to MAA on 2026-10-14, departs 09:30Z, VT-DXA, 162 seats, 1 block hours; DX404 MAA to BLR on 2026-10-14, departs 11:15Z, VT-DXA, 162 seats, 1 block hours; DX421 BLR to CCU on 2026-10-14, departs 03:00Z, VT-DXB, 162 seats, 2.5 block hours; DX422 CCU to BLR on 2026-10-14, departs 06:15Z, VT-DXB, 162 seats, 2.5 block hours; DX423 BLR to HYD on 2026-10-14, departs 09:30Z, VT-DXB, 162 seats, 1.25 block hours; DX424 HYD to BLR on 2026-10-14, departs 11:30Z, VT-DXB, 162 seats, 1.25 block hours. Those are the first few; ask to narrow it down."
     },
     {
       "case_id": "H11",
       "kind": "rewording",
       "prompt": "List the Delhi-based captains and how many there are.",
-      "passed": false,
-      "source": "clarify",
-      "intent": "LOOKUP_ROSTER",
-      "ms": 6272,
-      "model_calls": 2,
-      "tokens": 6060,
+      "passed": true,
+      "source": "template",
+      "intent": "LOOKUP_CREW",
+      "ms": 4699,
+      "model_calls": 1,
+      "tokens": 296,
       "checks": {
         "sourced": true,
         "pii": false,
-        "route_ok": false,
-        "agreement": 0.0
+        "route_ok": true,
+        "agreement": 1.0
       },
-      "answer": "I read this as lookup roster, but couldn't run it. Nothing was checked, so this doesn't mean all is clear."
+      "answer": "S. Kapoor (C-2210), Captain, based DEL, rated A320, reachable in 45 minutes."
     },
     {
       "case_id": "H12",
@@ -225,7 +225,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_FLIGHT",
-      "ms": 1963,
+      "ms": 1851,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -243,7 +243,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_CREW",
-      "ms": 1804,
+      "ms": 1934,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -261,7 +261,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_FLIGHT",
-      "ms": 1785,
+      "ms": 1891,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -279,7 +279,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_ROSTER",
-      "ms": 1833,
+      "ms": 1780,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -297,7 +297,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_RISK",
-      "ms": 1900,
+      "ms": 1860,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -315,7 +315,7 @@
       "passed": true,
       "source": "explained",
       "intent": "IMPACT_OF_EVENT",
-      "ms": 3056,
+      "ms": 3030,
       "model_calls": 1,
       "tokens": 292,
       "checks": {
@@ -333,7 +333,7 @@
       "passed": true,
       "source": "explained",
       "intent": "CHECK_LEGALITY",
-      "ms": 3364,
+      "ms": 3239,
       "model_calls": 1,
       "tokens": 393,
       "checks": {
@@ -351,7 +351,7 @@
       "passed": false,
       "source": "template",
       "intent": "LOOKUP_FLIGHT",
-      "ms": 1920,
+      "ms": 1922,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -369,9 +369,9 @@
       "passed": false,
       "source": "template",
       "intent": "CHECK_LEGALITY",
-      "ms": 7220,
+      "ms": 6546,
       "model_calls": 2,
-      "tokens": 13018,
+      "tokens": 13001,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -385,11 +385,11 @@
       "kind": "rewording",
       "prompt": "If we position C-2210 from Delhi to Bangalore on the morning of 13 Oct, can they legally take P-2291, and what does it do to the operation?",
       "passed": true,
-      "source": "template",
+      "source": "explained",
       "intent": "CHECK_LEGALITY",
-      "ms": 4533,
-      "model_calls": 0,
-      "tokens": 0,
+      "ms": 5022,
+      "model_calls": 1,
+      "tokens": 360,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -405,16 +405,16 @@
       "passed": true,
       "source": "explained",
       "intent": "CHECK_LEGALITY",
-      "ms": 3096,
+      "ms": 2962,
       "model_calls": 1,
-      "tokens": 274,
+      "tokens": 268,
       "checks": {
         "sourced": true,
         "pii": false,
         "route_ok": true,
         "agreement": 1.0
       },
-      "answer": "S. Krishnan (C-5417) is not legal for P-2213. RULE-CERT-06 fails: recurrent training expired 2026-10-15, invalid on 2026-10-17."
+      "answer": "C-5417 is not legal for P-2213. RULE-CERT-06 fails: recurrent_training expired 2026-10-15, invalid on 2026-10-17."
     },
     {
       "case_id": "H23",
@@ -423,7 +423,7 @@
       "passed": true,
       "source": "template",
       "intent": "CHECK_LEGALITY",
-      "ms": 3255,
+      "ms": 2893,
       "model_calls": 1,
       "tokens": 194,
       "checks": {
@@ -441,7 +441,7 @@
       "passed": false,
       "source": "template",
       "intent": "LOOKUP_RESERVE",
-      "ms": 1863,
+      "ms": 2088,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -459,7 +459,7 @@
       "passed": true,
       "source": "explained",
       "intent": "IMPACT_OF_EVENT",
-      "ms": 3020,
+      "ms": 3090,
       "model_calls": 1,
       "tokens": 216,
       "checks": {
@@ -475,36 +475,36 @@
       "kind": "rewording",
       "prompt": "Who's at 45 duty hours or more for the 7 days to 13 Oct?",
       "passed": false,
-      "source": "template",
+      "source": "model",
       "intent": "LOOKUP_DUTY_CLOCK",
-      "ms": 7939,
+      "ms": 7741,
       "model_calls": 4,
-      "tokens": 34660,
+      "tokens": 35033,
       "checks": {
         "sourced": true,
         "pii": false,
         "route_ok": false,
         "agreement": null
       },
-      "answer": "By duty hours 7d, highest first: C-3305: 56.4 duty hours in the last week and 33.6 flight hours in the last four weeks, as of 2026-10-12; C-2087: 51.83 duty hours in the last week and 23.5 flight hours in the last four weeks, as of 2026-10-12; C-2143: 41.78 duty hours in the last week and 79.24 flight hours in the last four weeks, as of 2026-10-12; C-4531: 40.96 duty hours in the last week and 68.88 flight hours in the last four weeks, as of 2026-10-12; C-4296: 40.63 duty hours in the last week and 77.57 flight hours in the last four weeks, as of 2026-10-12; C-4326: 40.2 duty hours in the last week and 69.06 flight hours in the last four weeks, as of 2026-10-12; C-2875: 38.66 duty hours in the last week and 69 flight hours in the last four weeks, as of 2026-10-12; C-1671: 38.26 duty hours in the last week and 68.13 flight hours in the last four weeks, as of 2026-10-12.\n2 crew members: R. Iyer (C-2087), Captain, based BLR, rated A320, reachable in 35 minutes; V. Menon (C-3305), Captain, based BLR, rated A320, reachable in 30 minutes.\nP. Sen (C-2143), Captain, based BLR, rated A320, reachable in 55 minutes."
+      "answer": "C-3305 V. Menon (Captain, A320, base BLR) is at 56.4 duty hours; C-2087 R. Iyer (Captain, A320, base BLR) is at 51.83 duty hours. Both are above 45. No other crew in the lookup exceed 45."
     },
     {
       "case_id": "H27",
       "kind": "rewording",
       "prompt": "VT-DXE's captain called sick at 01:30Z on 14 Oct. Which reserve captains are on call then, and are they qualified?",
       "passed": true,
-      "source": "template",
+      "source": "explained",
       "intent": "FIND_REPLACEMENT",
-      "ms": 3600,
+      "ms": 3837,
       "model_calls": 1,
-      "tokens": 495,
+      "tokens": 500,
       "checks": {
         "sourced": true,
         "pii": false,
         "route_ok": true,
         "agreement": 1.0
       },
-      "answer": "L. Verma (C-3231), Captain on P-2224 (VT-DXE).\nFor the Captain seat on P-2224 with C-3231 out, the cheapest legal choice is to assign Captain M. Pillai (C-3315) (reserve callout), ₹21,110. Next: assign Captain H. Naidu (C-2091) (day-off callout), ₹26,700; assign Captain R. Kapoor (C-3721) (day-off callout), ₹26,970. 6 legal options in all. Cancelling instead costs ₹1,000,000, 47 times as much."
+      "answer": "L. Verma (C-3231), Captain on P-2224 (VT-DXE). For the Captain seat on P-2224 with C-3231 out, the cheapest legal choice is to assign Captain M. Pillai (C-3315) (reserve callout), ₹21,110. Next: assign Captain H. Naidu (C-2091) (day-off callout), ₹26,700; assign Captain R. Kapoor (C-3721) (day-off callout), ₹26,970. 6 legal options in all. Cancelling instead costs ₹1,000,000, 47 times as much."
     },
     {
       "case_id": "H28",
@@ -513,7 +513,7 @@
       "passed": true,
       "source": "explained",
       "intent": "CHECK_LEGALITY",
-      "ms": 3370,
+      "ms": 3019,
       "model_calls": 1,
       "tokens": 323,
       "checks": {
@@ -531,7 +531,7 @@
       "passed": true,
       "source": "explained",
       "intent": "IMPACT_OF_EVENT",
-      "ms": 3035,
+      "ms": 3165,
       "model_calls": 1,
       "tokens": 235,
       "checks": {
@@ -549,9 +549,9 @@
       "passed": false,
       "source": "template",
       "intent": "SIMULATE_WHATIF",
-      "ms": 7790,
+      "ms": 8238,
       "model_calls": 1,
-      "tokens": 5895,
+      "tokens": 5885,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -567,9 +567,9 @@
       "passed": true,
       "source": "template",
       "intent": "RANK_OPTIONS",
-      "ms": 5104,
+      "ms": 3527,
       "model_calls": 1,
-      "tokens": 513,
+      "tokens": 511,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -585,7 +585,7 @@
       "passed": true,
       "source": "template",
       "intent": "JOINT_PLAN",
-      "ms": 3422,
+      "ms": 3678,
       "model_calls": 1,
       "tokens": 418,
       "checks": {
@@ -603,7 +603,7 @@
       "passed": false,
       "source": "explained",
       "intent": "RANK_OPTIONS",
-      "ms": 4439,
+      "ms": 4186,
       "model_calls": 1,
       "tokens": 776,
       "checks": {
@@ -612,7 +612,7 @@
         "route_ok": true,
         "agreement": 0.33
       },
-      "answer": "6 crew assignments: V. Chandra (C-3187), Captain on P-2203 (VT-DXA); P. Kapoor (C-5375), First Officer on P-2203 (VT-DXA); A. Pillai (C-3211), Senior Cabin Crew on P-2203 (VT-DXA); R. Gupta (C-2876), Cabin Crew on P-2203 (VT-DXA); L. Kulkarni (C-1542), Cabin Crew on P-2203 (VT-DXA); T. Malhotra (C-5089), Cabin Crew on P-2203 (VT-DXA).\n\nFor the Captain seat on P-2203 with C-3187 out, the cheapest legal choice is to assign Captain V. Menon (C-3305) (reserve callout), ₹23,540. Next: assign Captain A. Sharma (C-5837) (day-off callout), ₹25,440; assign Captain D. Chandra (C-3940) (day-off callout), ₹30,300. 6 legal options in all. Cancelling instead costs ₹1,000,000, 42 times as much."
+      "answer": "6 crew assignments: V. Chandra (C-3187), Captain on P-2203 (VT-DXA); P. Kapoor (C-5375), First Officer on P-2203 (VT-DXA); A. Pillai (C-3211), Senior Cabin Crew on P-2203 (VT-DXA); R. Gupta (C-2876), Cabin Crew on P-2203 (VT-DXA); L. Kulkarni (C-1542), Cabin Crew on P-2203 (VT-DXA); T. Malhotra (C-5089), Cabin Crew on P-2203 (VT-DXA). For the Captain seat on P-2203 with C-3187 out, the cheapest legal choice is to assign Captain V. Menon (C-3305) (reserve callout), ₹23,540. Next: assign Captain A. Sharma (C-5837) (day-off callout), ₹25,440; assign Captain D. Chandra (C-3940) (day-off callout), ₹30,300. 6 legal options in all. Cancelling instead costs ₹1,000,000, 42 times as much."
     },
     {
       "case_id": "H34",
@@ -621,7 +621,7 @@
       "passed": true,
       "source": "explained",
       "intent": "RESOLVE_ILLEGAL",
-      "ms": 3920,
+      "ms": 3498,
       "model_calls": 1,
       "tokens": 579,
       "checks": {
@@ -639,7 +639,7 @@
       "passed": true,
       "source": "explained",
       "intent": "RANK_OPTIONS",
-      "ms": 3410,
+      "ms": 3469,
       "model_calls": 1,
       "tokens": 514,
       "checks": {
@@ -657,7 +657,7 @@
       "passed": true,
       "source": "explained",
       "intent": "DRAFT_NOTIFICATION",
-      "ms": 4004,
+      "ms": 4202,
       "model_calls": 1,
       "tokens": 729,
       "checks": {
@@ -675,7 +675,7 @@
       "passed": true,
       "source": "explained",
       "intent": "RANK_OPTIONS",
-      "ms": 3334,
+      "ms": 3384,
       "model_calls": 1,
       "tokens": 499,
       "checks": {
@@ -693,9 +693,9 @@
       "passed": true,
       "source": "template",
       "intent": "RANK_OPTIONS",
-      "ms": 7955,
-      "model_calls": 1,
-      "tokens": 5979,
+      "ms": 7765,
+      "model_calls": 2,
+      "tokens": 7089,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -711,9 +711,9 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 5118,
+      "ms": 4877,
       "model_calls": 1,
-      "tokens": 257,
+      "tokens": 290,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -728,9 +728,9 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 3787,
+      "ms": 3760,
       "model_calls": 1,
-      "tokens": 255,
+      "tokens": 288,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -745,7 +745,7 @@
       "passed": true,
       "source": "clarify",
       "intent": "RANK_OPTIONS",
-      "ms": 2563,
+      "ms": 2227,
       "model_calls": 1,
       "tokens": 5885,
       "checks": {
@@ -762,9 +762,9 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 3879,
+      "ms": 3988,
       "model_calls": 1,
-      "tokens": 257,
+      "tokens": 290,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -779,9 +779,9 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 3667,
+      "ms": 3478,
       "model_calls": 1,
-      "tokens": 258,
+      "tokens": 291,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -796,9 +796,9 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 3595,
+      "ms": 3682,
       "model_calls": 1,
-      "tokens": 255,
+      "tokens": 288,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -813,7 +813,7 @@
       "passed": false,
       "source": "template",
       "intent": "LOOKUP_CREW",
-      "ms": 2003,
+      "ms": 1984,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -830,9 +830,9 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 3775,
+      "ms": 4499,
       "model_calls": 1,
-      "tokens": 255,
+      "tokens": 288,
       "checks": {
         "sourced": true,
         "pii": false,
@@ -847,7 +847,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_DUTY_CLOCK",
-      "ms": 1862,
+      "ms": 1869,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -864,7 +864,7 @@
       "passed": true,
       "source": "template",
       "intent": "CHECK_LEGALITY",
-      "ms": 1903,
+      "ms": 1893,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -881,7 +881,7 @@
       "passed": true,
       "source": "template",
       "intent": "LOOKUP_DUTY_CLOCK",
-      "ms": 1841,
+      "ms": 1977,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -898,7 +898,7 @@
       "passed": true,
       "source": "clarify",
       "intent": "LOOKUP_CREW",
-      "ms": 915,
+      "ms": 1005,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -915,7 +915,7 @@
       "passed": true,
       "source": "clarify",
       "intent": "FIND_REPLACEMENT",
-      "ms": 922,
+      "ms": 936,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -932,7 +932,7 @@
       "passed": true,
       "source": "clarify",
       "intent": "FIND_REPLACEMENT",
-      "ms": 966,
+      "ms": 1013,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -949,7 +949,7 @@
       "passed": true,
       "source": "template",
       "intent": "FIND_REPLACEMENT",
-      "ms": 3248,
+      "ms": 3136,
       "model_calls": 1,
       "tokens": 420,
       "checks": {
@@ -966,7 +966,7 @@
       "passed": true,
       "source": "explained",
       "intent": "CHECK_LEGALITY",
-      "ms": 2678,
+      "ms": 2909,
       "model_calls": 1,
       "tokens": 191,
       "checks": {
@@ -983,7 +983,7 @@
       "passed": true,
       "source": "template",
       "intent": "EXPLAIN_RULE",
-      "ms": 1925,
+      "ms": 1782,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -1018,7 +1018,7 @@
       "passed": true,
       "source": "refused",
       "intent": null,
-      "ms": 889,
+      "ms": 967,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
@@ -1035,7 +1035,7 @@
       "passed": true,
       "source": "refused",
       "intent": null,
-      "ms": 967,
+      "ms": 1033,
       "model_calls": 0,
       "tokens": 0,
       "checks": {
