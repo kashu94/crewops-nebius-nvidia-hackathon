@@ -260,6 +260,31 @@ def test_off_topic_after_triage_gets_the_scope_without_the_advisor():
     assert answer.text == SCOPE and answer.trace == [] and drafts == []
 
 
+@pytest.mark.parametrize(
+    ("caller", "question"),
+    [
+        (
+            Caller("u-crew", frozenset({Role.CREW}), crew_id="C-1042"),
+            "How many duty hours does C-3310 have?",
+        ),
+        (
+            Caller("u-rep", frozenset({Role.REPORTER})),
+            "Rank the cover options for C-1042 on P-2291.",
+        ),
+    ],
+)
+def test_a_role_refusal_never_goes_to_the_advisor(caller, question):
+    drafts = []
+
+    def drafter(*args):
+        drafts.append(args)
+        return "C-3310 has worked hard."
+
+    answer = model_pipeline(drafter).answer(question, caller)
+    assert drafts == [] and not any(e.ok for e in answer.trace)
+    assert "isn't available to your role" in answer.text or "doesn't give access" in answer.text
+
+
 def test_second_round_planner_findings(pipeline):
     reserves = ask(pipeline, "Who is on reserve at BLR between 13 and 15 Oct?")
     assert reserves.trace[0].args["filters"]["dates"] == {"gte": "2026-10-13", "lte": "2026-10-15"}

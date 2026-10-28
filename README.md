@@ -825,15 +825,14 @@ uv run python -m crewops.agent.evaluate --live --json web/public/evals/live.json
 
 ## Friction log
 
-Problems hit while building are recorded as they happened in
-[docs/FRICTION_LOG.md](docs/FRICTION_LOG.md), in five groups: Nebius Token Factory and
-NVIDIA Nemotron, the Amazon ecosystem (Alexa, Bedrock, AgentCore, MCP), the AWS backend
-infrastructure, the core software stack and local tooling, and the bugs that tests, reviews
-and live runs found in our own code, with how each was fixed.
+Problems hit while building the model layer on Nebius Token Factory with NVIDIA Nemotron
+are recorded as they happened in [docs/FRICTION_LOG.md](docs/FRICTION_LOG.md): the
+service and the model, and the bugs in our own code that only live runs with the model
+found, with how each was fixed.
 
-Product feedback for Nebius Token Factory, the NVIDIA model, and each other tool, API and
-SDK used (what for, what worked, what needs work, onboarding, and whether we would build
-with it again), with feature requests, is in [docs/PRODUCT_FEEDBACK.md](docs/PRODUCT_FEEDBACK.md).
+Product feedback for Nebius Token Factory and NVIDIA Nemotron (what for, what worked, what
+needs work and onboarding), with feature requests,
+is in [docs/PRODUCT_FEEDBACK.md](docs/PRODUCT_FEEDBACK.md).
 
 ## License
 

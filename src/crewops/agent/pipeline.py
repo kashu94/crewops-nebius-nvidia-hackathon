@@ -273,8 +273,14 @@ class Pipeline:
         # Only ask the model when the planned calls produced nothing usable. Otherwise the
         # template says exactly what they returned, and a model's extra conclusion (no id or
         # number in it) could slip past the verifier. Nor when triage said the question isn't
-        # about crew control: there is nothing for the advisor to look up.
-        wants_model = not any(e.ok for e in trace) and not route.off_topic
+        # about crew control: there is nothing for the advisor to look up. Nor when the caller's
+        # role may run none of the planned calls, or every one it ran was refused: that is a
+        # refusal, not a question for the advisor to work around with other tools.
+        role_blocked = bool(planned) and (
+            all(c.name not in allowed and not own_records(caller, c.name, c.args) for c in planned)
+            or (bool(trace) and all(e.error_code == "FORBIDDEN" for e in trace))
+        )
+        wants_model = not any(e.ok for e in trace) and not route.off_topic and not role_blocked
         if not trace and (seat := self._which_seat(route)):
             # the asker says which seat, never a model
             return Answer(question, seat, route, source="clarify", awaiting="detail", notes=notes)
